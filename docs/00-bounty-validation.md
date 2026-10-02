@@ -58,7 +58,7 @@ Verified = read in the sponsor's docs this session. Unverified items are gated i
 
 | Layer | Always ships | Ships if gates pass |
 |---|---|---|
-| Protocol | Registry, passkey custody, RLN proofs, BTX slash | Screened tree (Nansen), Compliant tree (Cleanverse) |
+| Protocol | Registry, passkey custody, RLN proofs, commit–reveal slash (BTX not available per Phase 0 gate G1; revisit only if a mentor provides a testnet interface) | Screened tree (Nansen), Compliant tree (Cleanverse) |
 | Wallets | Privy agent wallets | Dynamic service wallets |
 | Demo | Qwen "Scout" agent, MCP server behind QUOTA, console | — |
 

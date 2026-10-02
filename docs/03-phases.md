@@ -10,9 +10,9 @@ Window: **1 Oct → 13 Oct** (submit a day early; deadline 14 Oct 09:29 IST). Ph
 Goal: kill unknowns before writing real code.
 
 - [ ] Monorepo, `.env.example`, public GitHub repo, grant `metropolis@hackathon.monad.xyz`.
-- [ ] Foundry + Node toolchain; deploy a hello contract to Monad testnet.
-- [ ] Confirm testnet chain ID, RPC, faucet, explorer.
-- [ ] **Gate BTX:** ask Monad mentors; find the interface; does it hide target + calldata or only payload? Decide `btx` vs commit–reveal as primary.
+- [x] Foundry + Node toolchain. [ ] Deploy hello contract to Monad testnet (blocked: faucet funding, see `docs/gates.md`).
+- [x] Confirm testnet chain ID, RPC, faucet, explorer (`docs/gates.md` G0).
+- [x] **Gate BTX:** no public interface found; **commit–reveal is primary** (provisional, mentor answer still open). See `docs/gates.md` G1.
 - [ ] **Gate Privy:** `personal_sign` deterministic? policy covers what? sign-only works on Monad?
 - [ ] **Gate Dynamic:** one signed Monad tx, sign-only; delegated-access webhook reachable. Fail → drop.
 - [ ] **Gate Cleanverse:** invitation code, read the 3 guides, CVA on testnet, CVI callable on-chain. Fail → drop.
@@ -44,7 +44,7 @@ Goal: kill unknowns before writing real code.
 ## Phase 3 — Slash and BTX path (5–7 Oct)
 - [ ] `slash(a0, limit, receiver)` with leaf recompute and payout.
 - [ ] `SubmitPath`: `commitReveal` (guaranteed) and `btx` (if gate passed).
-- [ ] **Searcher test:** a bot watches the public path and tries to copy the slash. It must fail on both paths where the path is private/committed, and succeed on a naive path (to prove the race is real).
+- [ ] **Searcher test:** a bot watches the public path and tries to copy the slash. It must fail on the commit–reveal path (and on `btx` if present), and succeed on a naive path (to prove the race is real).
 - [ ] Slasher service: violation → queue → slash.
 
 **Exit:** on-chain slash with reward received; copy-and-steal test result documented.
