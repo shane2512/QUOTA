@@ -1,74 +1,74 @@
 # QUOTA — Phase 0 Gates
 
-Status: **PASS** (observed) · **FAIL** · **PENDING** (needs a human input; not yet tested) · **PARTIAL** (docs read, live call not made).
-Nothing here is marked PASS from memory. Last updated: 2026-10-02.
+Status: **PASS** (observed) · **FAIL** · **PARTIAL** (some parts observed) · **DEFERRED** (owner decision).
+Nothing is marked PASS from memory. Last updated: 2026-10-03. Test wallets/addresses below are public testnet data; no secrets are recorded here.
 
-## G0 — Monad testnet + toolchain
+## G0 — Monad testnet + toolchain: PASS
 
 | Item | Result | Evidence |
 |---|---|---|
-| Chain ID | **PASS** `10143` | `cast chain-id --rpc-url https://testnet-rpc.monad.xyz` → `10143` |
-| RPC | **PASS** | same RPC: `cast block-number` → `67510859` (live). Docs list also `https://rpc.ankr.com/monad_testnet`, `https://rpc-testnet.monadinfra.com` |
-| Explorer | PASS (docs) | `https://testnet.monadvision.com`, `https://testnet.monadscan.com` — https://docs.monad.xyz/developer-essentials/testnets |
-| Faucet | PARTIAL | `https://faucet.monad.xyz` (docs). Funding is a human step. |
-| P256VERIFY `0x100` on testnet | **PASS** | `cast call 0x…0100 <RIP-7212 valid vector>` → `0x…01`. (Invalid input returns empty; only valid-vector result recorded.) |
-| Testnet reset | note | Docs: testnet reset from genesis 2025-12-16. Chain version `v0.15.2 / MONAD_NINE`. |
-| Local toolchain | PASS | forge/cast 1.5.1-stable, node v22.13.1, pnpm 11.25.0. `forge test` → 1 passed (Hello). circom/snarkjs not yet installed (Phase 2). |
-| Hello contract deployed | **PENDING** | Deployer EOA generated (address `0x0437938E18Bd2E6d8Cad0921C8dc1e7Ff28Df7b2`, key only in gitignored `.env`). Needs test MON from the faucet. |
+| Chain ID / RPC | PASS | `cast chain-id --rpc-url https://testnet-rpc.monad.xyz` → `10143` |
+| Explorer, faucet | PASS (docs) | `https://testnet.monadvision.com`, `https://faucet.monad.xyz` — https://docs.monad.xyz/developer-essentials/testnets |
+| P256VERIFY `0x100` | PASS | `cast call 0x…0100 <RIP-7212 valid vector>` → `0x…01` |
+| Hello deployed | PASS | `0x30A8e23Db6A8959913986336C749d7C8FCbFF0cf`, tx `0xf5b1578aa7d41c55671cd717ecda135bf95f3fb95ac7b7a3cd188049aaed4ae3`, block 67894111, status 1, gasUsed 227242. `greeting()` → `"QUOTA"`, `chainId()` → `10143`. Explorer source verification not yet done (Phase 1). |
+| Toolchain | PASS | forge/cast 1.5.1-stable, node 22.13.1, pnpm 11.25.0 (Windows); WSL Ubuntu with node 22.13.1 for Linux-only SDKs |
+| Fee floor | note | Monad rejected a tx with `maxFee` 10 gwei ("Transaction fee too low"); `cast gas-price` → 102 gwei. Use ≥ 200 gwei max fee in scripts. |
 
-## G1 — BTX (encrypted mempool)
+## G1 — BTX: FAIL (confirmed by organizers)
 
-**Decision: `commitReveal` is primary. `btx` is not planned unless a mentor provides a testnet interface.** Status: **FAIL (provisional)** — no public interface found; mentor confirmation still outstanding.
+Organizers confirmed BTX is not available. Own research agreed: no BTX page in docs.monad.xyz index; BTX is a research scheme (https://category-labs.github.io/category-research/BTX-paper.pdf). **Decision: `commitReveal` is the only slash path.** B3 `btx` is dropped. Docs must state the front-runner is a leader/RPC operator (no global mempool) and that commit–reveal is not BTX.
 
-Evidence:
-- Searched official Monad docs index (`docs.monad.xyz/llms.txt`): no page mentions BTX, encrypted mempool or threshold encryption.
-- BTX is published as a research scheme by Category Labs (paper: https://category-labs.github.io/category-research/BTX-paper.pdf). The Monad post calls it a building block for "a working encrypted mempool" (X post, could not be fetched directly: HTTP 402; text seen via search snippet only).
-- Search results place the encrypted mempool as the *concluding* phase of Monad's privacy roadmap (secondary source, not official docs).
-- Not established: whether a hackathon-only testnet interface exists. Only Monad mentors can say. **Human action: ask on the hackathon Discord** (see checklist).
+## G2 — Privy: PASS
 
-Consequence: B3 ships as commit–reveal, labelled as the fallback. We will not call it BTX anywhere. Docs threat model says the front-runner is a leader/RPC operator (no global mempool).
-
-## G2 — Privy
+Test wallet: server wallet, **no owner/policy** (app-secret auth only). Owner + policy + additional-signer path is Phase 5.
 
 | Question | Result | Evidence |
 |---|---|---|
-| Does policy cover `personal_sign`? | **PASS (docs)** | Rules accept `method: personal_sign` with `message.content` operators (`eq`, `starts_with`, …) and `byte_length`. https://docs.privy.io/controls/policies/example-policies/ethereum#restrict-message-signing-by-content |
-| Sign-only exists? | **PASS (docs)** | `eth_signTransaction` returns RLP signed tx, accepts arbitrary `chain_id`. https://docs.privy.io/api-reference/wallets/ethereum/eth-sign-transaction |
-| Sign-only works on Monad (chain 10143)? | **PENDING** | Needs `PRIVY_APP_ID/SECRET`; sign a type-2 tx with `chain_id: 10143`, then broadcast with cast. |
-| `personal_sign` deterministic for same message? | **PENDING** | Needs live call, same message twice, compare. If it differs, fall back to encrypted blob for `a0` (PRD risk table). Note: Privy docs do not state determinism. |
-| Subsidized testnet | PENDING | Email `monad@privy.io` (human). |
+| `personal_sign` deterministic? | **PASS** | Same wallet, same message `QUOTA/rln-secret/v1`, 3 calls → 3 identical signatures. (Sample size 3; same wallet only.) |
+| Policy covers `personal_sign`? | PASS (docs only) | `message.content` / `byte_length` conditions — https://docs.privy.io/controls/policies/example-policies/ethereum#restrict-message-signing-by-content. Not yet exercised live. |
+| Sign-only works on Monad? | **PASS** | `eth_signTransaction` with `chain_id: 10143` → RLP; `cast decode-tx` signer = wallet `0x9682FD25c31F982FF008b827f195E47b96D6af3a`; broadcast with `cast publish`: tx `0x9bea1efd0a35002e143e7be82967f051626c95fc02ed571fb63d4c7a4e352cb7`, status 1. (An earlier attempt, `0x1489a583…`, was mined but reverted because I used a wrong function selector; the signing path itself worked.) |
+| Subsidized testnet | not needed so far | |
 
-## G3 — Dynamic
+## G3 — Dynamic: PARTIAL (keep via server-wallet fallback)
 
-Status: **PENDING** (needs `DYNAMIC_ENVIRONMENT_ID`, `DYNAMIC_API_TOKEN`).
-Docs read: delegated access sends `wallet.delegation.created/revoked` webhooks carrying `walletId`, `walletApiKey`, `keyShare`; `delegatedSignTransaction` returns a signed EVM tx (https://www.dynamic.xyz/docs/node/evm/delegated-access). Monad lists Dynamic as supported embedded-wallet provider (https://docs.monad.xyz/tooling-and-infra/wallet-infra/embedded-wallets). Not yet shown: a Monad testnet signature, a reachable webhook. Cut rule applies: no signed Monad tx by end of Phase 0 → drop.
+| Item | Result | Evidence |
+|---|---|---|
+| Auth with env ID + API token | PASS | `@dynamic-labs-wallet/node-evm` `authenticateApiToken` ok |
+| Server wallet created | PASS | `0xb1E9a0311088528F6cD90316a7f3c7E86d43060a` (TWO_OF_TWO, backed up to Dynamic) |
+| Sign-only Monad testnet tx | **PASS** | `signTransaction` (chainId 10143) → `cast decode-tx` signer matches; broadcast tx `0x4d187a9a3da89a24a1e8e022ce420e67256eb015fb6aed3eef3f5aad498dbefa`, block 67895388, status 1. |
+| Delegated-access webhook reachable | **NOT TESTED** | Needs an end-user embedded wallet + public HTTPS URL (`DYNAMIC_WEBHOOK_PUBLIC_URL` empty). |
+| Platform | **constraint** | `@dynamic-labs-wallet/node` native module: "Neon: unsupported system: win32". Must run on Linux/macOS (WSL for dev; deploy on Linux). |
 
-## G4 — Cleanverse
+Consequence: W3 uses the documented fallback (Dynamic server wallet) unless the delegated flow is proven in Phase 5. Do not claim delegated access until a webhook is received.
 
-Status: **PENDING** (blocked on invitation code; likely partial FAIL if not supplied).
-Evidence: `https://docs.cleanverse.com` shows only an invitation-code input (observed). No access to the three Drive guides. Not tested: CVA on Monad testnet, on-chain CVI call, sandbox credentials. Any single failure → drop. Credentials must go to `.env` only.
+## G4 — Cleanverse: FAIL → DROP (cut rule)
 
-## G5 — Nansen
+- `https://docs.cleanverse.com` is invitation-code gated; no code supplied, three Drive guides not read.
+- Public search turned up CVI/CVA addresses in a *third-party hackathon repo* (TrustFlow). On-chain check: `sourceId()` on that "CVI oracle" returns `"trustflow-mock-oracle-v1"` — it is that project's mock, **not Cleanverse's**. Not usable as evidence.
+- Sandbox API base URL and request-encryption format are undocumented in public sources, so the credentials could not be tested.
+- Reopen only if the user provides the invitation code before Phase 5 ends. Until then Compliant tree (C8/T3) is cut.
 
-Status: **PENDING** (needs `NANSEN_API_KEY`).
-Docs seen via search: Profiler endpoints `https://api.nansen.ai/api/v1/profiler/address/{labels,related-wallets,counterparties}`, key in `apikey` header (https://docs.nansen.ai/api/overview). `docs.nansen.ai` failed TLS from this machine's fetch tool, so exact request bodies and credit costs are unverified. Pass requires one real Profiler call with data for a Monad address.
+## G5 — Nansen: PARTIAL
 
-## G6 — Qwen
+| Endpoint | Result | Evidence |
+|---|---|---|
+| `POST /api/v1/profiler/address/labels` (chain `monad`) | **PASS** | HTTP 200; ERC-8004 IdentityRegistry `0x8004A1…a432` → labels `ERC721`, `AgentIdentity`, `AGENT`, `Token Contract` |
+| `related-wallets`, `counterparties` | **FAIL (credits)** | HTTP 403 `insufficient_credits` |
 
-Status: **PARTIAL**.
-- Model ID per Alibaba Cloud docs search result: `qwen3.8-max` (page: https://help.aliyun.com/en/model-studio/qwen3-8-max — direct fetch failed: ECONNREFUSED, so not read in full).
-- OpenAI-compatible base URL is workspace-scoped and regional: `https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1` (search snippet; international/Singapore URL unconfirmed).
-- Not done: one tool-calling round trip (needs `QWEN_API_KEY`, workspace ID, region).
-- Note: hackathon prompt says "Qwen 3.8 Max" via qwencloud.com; confirm that console issues keys for this same model ID.
+Consequence: the Screener's recidivism rule (T2) needs related-wallets/counterparties. Needs credits (ask Nansen sponsor channel) or Screener falls back to labels + our own funding-source trace from chain data. Nansen stays conditional; cut early if credits don't arrive.
+
+## G6 — Qwen: DEFERRED (owner decision, 2026-10-03)
+
+Hosted `qwen3.8-max` is not free; key not set. The agent loop stays provider-agnostic (D1). Alternatives, in order of preference: (1) Qwen credits via sponsor channel, (2) a Qwen open-weight model through any OpenAI-compatible free tier, (3) drop the Qwen bounty and use any tool-calling model. If (3), D1 still ships but no Qwen article or bounty claim. Decide before Phase 7.
 
 ## Summary
 
 | Gate | Status | Scope effect |
 |---|---|---|
-| G0 chain/toolchain | PASS except deploy (needs faucet) | none |
-| G1 BTX | FAIL (provisional) | commit–reveal primary |
-| G2 Privy | PARTIAL (docs PASS, live PENDING) | keep; derive `a0` fallback ready |
-| G3 Dynamic | PENDING | keep until end of Phase 0, then cut rule |
-| G4 Cleanverse | PENDING (blocked on code) | first cut candidate |
-| G5 Nansen | PENDING | conditional |
-| G6 Qwen | PARTIAL | keep |
+| G0 chain/toolchain/Hello | PASS | none |
+| G1 BTX | FAIL (confirmed) | commit–reveal only; `btx` dropped |
+| G2 Privy | PASS | keep |
+| G3 Dynamic | PARTIAL | keep as server-wallet; delegated access unproven |
+| G4 Cleanverse | FAIL | dropped |
+| G5 Nansen | PARTIAL | conditional; labels only until credits |
+| G6 Qwen | DEFERRED | decide before Phase 7 |
