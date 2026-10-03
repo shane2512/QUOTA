@@ -55,7 +55,7 @@ function tex(w: number, h: number, draw: (c: CanvasRenderingContext2D) => void) 
 }
 const hexs = (n: number) => "#" + n.toString(16).padStart(6, "0");
 
-export function createWorld(canvas: HTMLCanvasElement, opts: { onScene: (i: number) => void }) {
+export function createWorld(canvas: HTMLCanvasElement, opts: { onScene: (i: number) => void; onReady?: () => void }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
   const small = window.innerWidth < 860;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, small ? 1.5 : 1.75));
@@ -207,6 +207,7 @@ export function createWorld(canvas: HTMLCanvasElement, opts: { onScene: (i: numb
   const stations = [0, 1, 2, 3].map((i) => { const s = station(i); scene.add(s.g); return s; });
 
   /* ---- camera, loop, scroll ---- */
+  let dpr = Math.min(window.devicePixelRatio || 1, small ? 1.5 : 1.75), slow = 0, fast = 0, frames = 0;
   let target = 0, cur = 0, w = 1, h = 1, raf = 0, running = false, lastScene = -2, last = performance.now();
   const OVC = new THREE.Vector3(33.5, 0, 19.5);
   const dirO = new THREE.Vector3(0, 0.8, 0.6).normalize(), dirD = new THREE.Vector3(0.3, 0.36, 0.88).normalize();
@@ -238,12 +239,21 @@ export function createWorld(canvas: HTMLCanvasElement, opts: { onScene: (i: numb
     const t = now / 1000;
     stations.forEach((s) => s.anim.forEach((fn) => fn(t)));
     renderer.render(scene, camera);
+    if (++frames === 3) opts.onReady?.();
+    // adaptive quality: shed resolution when frames run long, never below 1x
+    const ms = dt * 1000;
+    if (frames > 20) {
+      if (ms > 26) { slow++; fast = 0; } else if (ms < 18) { fast++; slow = 0; }
+      if (slow > 12 && dpr > 1) { dpr = Math.max(1, dpr - 0.25); renderer.setPixelRatio(dpr); renderer.setSize(w, h, false); slow = 0; }
+    }
     if (running) raf = requestAnimationFrame(frame);
   };
   const start = () => { if (!running) { running = true; last = performance.now(); raf = requestAnimationFrame(frame); } };
   const stop = () => { running = false; cancelAnimationFrame(raf); };
   const io = new IntersectionObserver(([e]) => (e.isIntersecting ? start() : stop()), { threshold: 0 });
   io.observe(canvas);
+  const vis = () => (document.hidden ? stop() : start());
+  document.addEventListener("visibilitychange", vis);
   const resize = () => {
     w = canvas.clientWidth || 1; h = canvas.clientHeight || 1;
     renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
@@ -255,7 +265,7 @@ export function createWorld(canvas: HTMLCanvasElement, opts: { onScene: (i: numb
     setProgress: (p: number) => { target = Math.max(0, Math.min(1, p)); },
     resize,
     dispose: () => {
-      stop(); io.disconnect();
+      stop(); io.disconnect(); document.removeEventListener("visibilitychange", vis);
       geos.forEach((g) => g.dispose()); mats.forEach((m) => m.dispose());
       scene.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined; if (m && "map" in m && m.map) m.map.dispose(); if (m && "dispose" in m) m.dispose(); });
       blocks.dispose(); ribbon.dispose(); renderer.dispose();

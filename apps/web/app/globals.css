@@ -98,6 +98,12 @@ p { margin: 0; text-wrap: pretty; }
 .world { position: sticky; top: 0; height: 100dvh; overflow: hidden; background: var(--ground); }
 .world canvas.map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .world::before { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(100deg, var(--ground) 0%, color-mix(in srgb, var(--ground) 88%, transparent) 30%, transparent 58%), linear-gradient(180deg, color-mix(in srgb, var(--ground) 80%, transparent), transparent 22%); }
+.world .loader { position: absolute; inset: 0; z-index: 3; background: var(--ground); display: grid; place-content: end start; gap: var(--s3); padding: 0 var(--gutter) clamp(32px, 9vh, 96px); transition: opacity 600ms var(--ease); }
+.world .loader[data-done="true"] { opacity: 0; pointer-events: none; }
+.world .loader .bar { width: min(260px, 60vw); height: 6px; background: var(--rule); overflow: hidden; }
+.world .loader .bar i { display: block; width: 40%; height: 100%; background: var(--cobalt); animation: board 1.1s var(--ease) infinite; }
+@keyframes board { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+@media (prefers-reduced-motion: reduce) { .world .loader .bar i { animation: none; width: 100%; opacity: 0.5; } }
 .world .stack { position: relative; min-height: 300px; }
 .world .copy { position: absolute; z-index: 5; left: 0; bottom: 0; width: min(520px, 100%); padding: var(--s5) var(--s6) clamp(24px, 7vh, 72px) var(--gutter); background: var(--ground); border-top: 1.5px solid var(--ink); transition: opacity 360ms var(--ease); }
 .world .copy > * { transition: opacity 420ms var(--ease), transform 420ms var(--ease); }

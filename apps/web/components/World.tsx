@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { createWorld, holdStart, T_END } from "./scene3d";
+import type { createWorld as CreateWorld } from "./scene3d";
+
+const T_END = 120; // keep in sync with scene3d
+const holdStart = (i: number) => [18, 43, 68, 93][i];
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -19,7 +22,9 @@ export default function World() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [on, setOn] = useState(-1); // -1 hero, 0-3 stations, 4 outro
   const [ok, setOk] = useState(true);
-  const api = useRef<ReturnType<typeof createWorld> | null>(null);
+  const [ready, setReady] = useState(false);
+  const [gone, setGone] = useState(false);
+  const api = useRef<ReturnType<typeof CreateWorld> | null>(null);
 
   useEffect(() => {
     const el = track.current, cv = canvas.current;
@@ -28,7 +33,11 @@ export default function World() {
     (async () => {
       try { await Promise.all([document.fonts.load('800 100px "Archivo Variable"'), document.fonts.load('700 40px "JetBrains Mono Variable"')]); } catch {}
       if (dead) return;
-      try { api.current = createWorld(cv, { onScene: setOn }); } catch { setOk(false); return; }
+      try {
+        const { createWorld } = await import("./scene3d"); // three.js loads only now, after first paint
+        if (dead) return;
+        api.current = createWorld(cv, { onScene: setOn, onReady: () => setReady(true) });
+      } catch { setOk(false); setReady(true); return; }
       st = ScrollTrigger.create({ trigger: el, start: "top top", end: "bottom bottom", onUpdate: (s) => api.current?.setProgress(s.progress) });
       api.current.setProgress(st.progress);
       ro = new ResizeObserver(() => api.current?.resize());
@@ -48,6 +57,13 @@ export default function World() {
     <div className="world-track" ref={track}>
       <div className="world">
         <canvas ref={canvas} className="map" role="img" aria-label="A three-dimensional transit line with four stations: Stake, Prove, Check and Slash." />
+
+        {!gone && (
+          <div className="loader" data-done={ready} onTransitionEnd={() => ready && setGone(true)} aria-hidden="true">
+            <div className="bar"><i /></div>
+            <span className="label">Loading the line</span>
+          </div>
+        )}
 
         <div className="hero" style={{ opacity: on === -1 ? 1 : 0, transform: on === -1 ? "none" : "translateY(-12px)", pointerEvents: on === -1 ? "auto" : "none" }}>
           <h1 className="display">Rate limits that keep no record.</h1>
