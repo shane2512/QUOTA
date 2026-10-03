@@ -8,7 +8,7 @@ Append-only record of what was done, what was observed, and what is still open. 
 |---|---|---|
 | 0 Gates and setup | Done except Qwen (deferred by owner) | `docs/gates.md` written |
 | 1 Contracts: custody and registry | Done, two items open (explorer verification, Monad gas measurement) | 64 tests green; real passkey verified on testnet |
-| 2 RLN proofs | Not started | |
+| 2 RLN proofs | Done (local member; on-chain member proof waits for a passkey enroll) | `pnpm phase2` all PASS; 14 package tests green |
 | 3 Slash (commit–reveal) | Not started | |
 | 4 SDKs, middleware, demo MCP | Not started | |
 | 5 Wallet integrations | Not started | |
@@ -59,6 +59,10 @@ Append-only record of what was done, what was observed, and what is still open. 
 | Dynamic via server wallet, not delegated access | Webhook flow unproven |
 | `changeLimit` implemented | Required by PRD C3 |
 | Registry `rpId` and origins are immutable | Redeploy for the final domain in Phase 7 |
+| Added `@quota/core` (hashing, tree, wire format, artifacts, registry sync) | Client, server and the Phase 3 slasher all need the same hashing and tree; avoids client↔server coupling |
+| Own 80-line sparse Merkle tree instead of `@zk-kit/imt` | Only a 2.0 beta is current; correctness pinned by matching the live on-chain root |
+| `hashToField` = keccak256 >> 8; external nullifier = `Poseidon(hashToField(serverId), epoch)`; `x = hashToField(payloadHash)` | Semaphore convention; always inside the field |
+| `snarkjs` (GPL-3.0) for prove/verify | Same library rlnjs uses with these artifacts; licence noted for SDK consumers |
 
 ## Open items
 
@@ -72,6 +76,9 @@ Append-only record of what was done, what was observed, and what is still open. 
 - Read access for `metropolis@hackathon.monad.xyz`; push approval for commits after `e7b937e`.
 
 **Engineering**
+- **Contract: cap `limit` at 65535.** The circuit's `RangeCheck(16)` cannot represent a larger limit; today `enroll`/`changeLimit` accept `uint64`, so a member with limit > 65535 could never prove. Fix with the Phase 3 redeploy.
+- **Tree sync cost:** Monad testnet `eth_getLogs` is capped at 100 blocks. Syncing 28,384 blocks took 25.8 s (8 parallel requests) and grows ~216k blocks/day. Proposal (not built): store leaves on-chain (`leaves(i)`) or run an indexer, decided with the Phase 3 redeploy.
+- Proof against the on-chain root: needs a passkey-approved `enroll` of an agent whose `a0` we hold.
 - Measure real enroll gas on Monad with `eth_estimateGas` (Foundry model: 1,675,321 at depth 20; Monad bills the gas limit so receipts do not show usage).
 - Explorer source verification for the registry.
 - Slash needs a Merkle proof against the current root; enrolls can race it (design point for Phase 3).
@@ -87,3 +94,33 @@ Append-only record of what was done, what was observed, and what is still open. 
 - A Git-triggered build failed ("No Next.js version detected") because the project's Root Directory was `.`. Set Root Directory to `apps/web`, renamed the project to `quota-metro`, redeployed from the repo root (`.vercelignore` excludes `contracts`, `docs`, `pdf`), and aliased `quota-metro.vercel.app`.
 - Turned off Vercel Authentication for this project so the site is public (it was redirecting visitors to a Vercel login).
 - Live: `https://quota-metro.vercel.app` (HTTP 200). Content is mock/demo data. The Git-triggered build with the new Root Directory has not been re-tested yet; it runs on the next push.
+
+### 2026-10-04 — Phase 2: RLN proofs
+- **Artifacts:** vendored the PSE p0tion ceremony output `rln-20` (the default depth-20 params of rlnjs 3.x): `rln.wasm`, `rln_final.zkey`, `verification_key.json` in `packages/core/artifacts/rln-20/`, SHA-256 pinned in `SHA256SUMS` and in code; `loadArtifacts()` refuses mismatches. vkey: groth16, bn128, `nPublic` 5 (RLN-v2). No circuit compiled, no setup run.
+- **Compatibility:** read `circom-rln` `circuits/rln.circom` (`RLN(20, 16)`): leaf `Poseidon(Poseidon(a0), limit)`, node `Poseidon(l, r)`, zero leaf 0, public signals `[y, root, nullifier, x, externalNullifier]`. Same as `QuotaRegistry`. Found: `RangeCheck(16)` → limit must be ≤ 65535 (open item above).
+- **Packages:** `@quota/core` (hash, tree, wire format, artifact loader, `syncTree`), `@quota/client` (`QuotaClient.signRequest/prove`, per server+epoch message ids, `QuotaExhausted`, `allowOveruse` for the violation demo), `@quota/server` (`QuotaVerifier`, `MemoryNullifierStore`, `RegistryRootChecker`, `onViolation`).
+- **Tests:** `pnpm test` → core 9 pass, server 5 pass (real Groth16 proofs, no circuit mocks). `pnpm typecheck` clean.
+- **Exit check** `pnpm phase2` (output, 2026-10-04):
+  ```
+  registry 0x05a5fe209E19C6707e2E701A76A0C94b2351E0ac @ block 67933628: depth 20, leaves 1; synced 28384 blocks in 25816 ms
+  PASS  registry depth = circuit depth 20
+  PASS  off-chain leaf count 1 = on-chain 1
+  PASS  off-chain root = on-chain root (36627d69ecbe…)
+  PASS  registry.isKnownRoot(off-chain root)
+  PASS  merkle proof for on-chain leaf 0
+  PASS  honest request 1/3 verifies
+  PASS  honest request 2/3 verifies
+  PASS  honest request 3/3 verifies
+  PASS  4th request reuses message id 0 → violation
+  PASS  recovered secret equals a0 exactly (value not printed)
+  PASS  Poseidon(recovered) = member idCommitment
+  PASS  message id 0 accepted on server-a and server-b
+  PASS  different nullifiers per server, no false violation
+  PASS  server-b rejects a proof made for server-a
+  machine: Apple M2, 8 cores, node v26.9.0
+  proof generation (snarkjs groth16.fullProve, depth 20): median 1170 ms, min 902, max 1918 (n=10)
+  proof verification (snarkjs groth16.verify, incl. checks):  median 32 ms, min 18, max 66 (n=10)
+  ```
+- **Limit of this evidence:** the on-chain leaf from Phase 1 was enrolled with a random `idCommitment` (no known `a0`), so it cannot prove. The protocol checks ran against a member appended to a copy of the live tree, so their root is local, not on-chain. Hashing compatibility is proven by the root match; a proof against an on-chain root needs a passkey `enroll` of a known-`a0` agent.
+- Proof time 1.17 s median is under the 2 s budget (Z2) on this machine; Windows/browser numbers not measured.
+- Environment notes: this run was on macOS (M2). Foundry is not installed here and the contract submodules are not checked out, so `forge test` was **not** run in this session (no contract changes were made). pnpm 11 needed `allowBuilds: esbuild: true` in `pnpm-workspace.yaml` (tsx dependency).

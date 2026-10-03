@@ -33,11 +33,12 @@ Goal: kill unknowns before writing real code.
 **Exit:** `forge test` green incl. all negative cases; a real browser passkey assertion verifies on-chain on testnet.
 
 ## Phase 2 — ZK: RLN proofs (3–6 Oct)
-- [ ] Vendor and checksum RLN-v2 artifacts; pick tree depth.
-- [ ] `@quota/client` prover: `signRequest` with epoch/`k` tracking.
-- [ ] `@quota/server` verifier + nullifier store + secret recovery from two shares.
-- [ ] Recent-roots sync from the registry.
-- [ ] Benchmark proof gen/verify and record real numbers.
+- [x] Vendor and checksum RLN-v2 artifacts; pick tree depth (PSE ceremony `rln-20`, depth 20 = registry depth).
+- [x] `@quota/client` prover: `signRequest` with epoch/`k` tracking.
+- [x] `@quota/server` verifier + nullifier store + secret recovery from two shares.
+- [x] Recent-roots sync from the registry (tree rebuilt from `LeafSet` events; roots checked with `isKnownRoot`).
+- [x] Benchmark proof gen/verify and record real numbers (`docs/progress.md`).
+- [ ] Open: a proof against an **on-chain** root needs a member whose `a0` we know, i.e. a passkey-approved `enroll`. Do it at the start of Phase 3.
 
 **Exit:** script: 3 honest requests verify; a 2nd use of the same `k` recovers `a0` exactly; per-server external nullifier prevents cross-server collisions.
 
