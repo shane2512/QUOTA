@@ -1,0 +1,25 @@
+{
+  "name": "@quota/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "phase2": "tsx scripts/phase2-exit.ts"
+  },
+  "dependencies": {
+    "@quota/core": "workspace:*",
+    "snarkjs": "^0.7.6",
+    "viem": "^2.57.2"
+  },
+  "devDependencies": {
+    "@quota/client": "workspace:*",
+    "@types/node": "^26.6.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
