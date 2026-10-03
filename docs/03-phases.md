@@ -24,11 +24,11 @@ Goal: kill unknowns before writing real code.
 **Exit:** a `docs/gates.md` listing each gate PASS/FAIL with evidence. Scope is now fixed from it.
 
 ## Phase 1 — Contracts: custody and registry (2–4 Oct)
-- [ ] `PasskeyAuth`: WebAuthn assertion verification via `0x100` (all checks in PRD C2).
-- [ ] Test vectors: valid, wrong challenge, wrong origin, wrong rpId, missing UP/UV, high-s, replayed nonce, malformed JSON.
-- [ ] `QuotaRegistry`: tree (Poseidon), `registerPasskey`, `enroll`, `topUp`, `requestUnstake`/`unstake`, recent-roots window.
-- [ ] Measure enroll gas on Monad; apply risk fallback if too costly.
-- [ ] Deploy to testnet; verify on explorer.
+- [x] `PasskeyAuth`: WebAuthn assertion verification via `0x100` (all checks in PRD C2).
+- [x] Test vectors: valid, wrong challenge, wrong origin, wrong rpId, missing UP/UV, high-s, replayed nonce, malformed JSON.
+- [x] `QuotaRegistry`: tree (Poseidon), `registerPasskey`, `enroll`, `topUp`, `requestUnstake`/`unstake`, recent-roots window.
+- [ ] Measure enroll gas on Monad (forge model 1.68M at depth 20; Monad figure not yet measured, see `docs/deployments.md`).
+- [x] Deployed to testnet. [ ] Explorer source verification still open.
 
 **Exit:** `forge test` green incl. all negative cases; a real browser passkey assertion verifies on-chain on testnet.
 
