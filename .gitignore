@@ -5,3 +5,5 @@ node_modules/
 *.log
 out/
 cache/
+.next/
+next-env.d.ts
