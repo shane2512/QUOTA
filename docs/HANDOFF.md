@@ -106,6 +106,19 @@ Exit check `pnpm phase2`, all PASS (full output in `docs/progress.md`, 2026-10-0
 
 **Not yet shown:** a proof against an **on-chain** root. The only on-chain leaf has a random `idCommitment` (no known `a0`), so the protocol checks used a member appended to a copy of the live tree. Closing this needs one passkey-approved `enroll` of an agent whose `a0` we hold. Use `QuotaClient.idCommitment` as the `idCommitment` in the passkey tool. That needs the operator's passkey and the deployer key from `.env`.
 
+### Phase 2 session report (2026-10-04)
+- **Commits:** `e8d317d` (packages + artifacts), `c2ba33d` (docs). Local only, **not pushed**. Push needs owner approval.
+- **Evidence:** `pnpm test` → core 9/9, server 5/5 (real Groth16 proofs, no circuit mocks); `pnpm typecheck` clean; `pnpm phase2` all PASS. Proving median 1170 ms on an Apple M2 (2 s budget, PRD Z2); verify median 32 ms.
+- **Deviations from the PRD/layout:**
+  - Added `@quota/core` (not in the §6 layout). Client, server and the future slasher share its hashing and tree, so client and server don't import each other.
+  - Our own sparse Merkle tree instead of `@zk-kit/imt`, whose current release is a 2.0 beta. Correctness is pinned by the live root match.
+  - `snarkjs` is GPL-3.0. SDK consumers inherit that licence, so mention it in the docs.
+- **Not run this session:** `forge test`. The Mac had no Foundry and the contract submodules were not checked out. No contract files changed.
+- **Risks for the deadline:**
+  - Event-based tree sync slows down every day (100-block `getLogs` cap).
+  - The `limit` cap and slash both need a registry redeploy. Do them together, along with any leaf-storage change.
+  - The on-chain proof check depends on the owner being at the passkey machine.
+
 ## 9. Phase 3 — what to do next (slash, commit–reveal)
 Exit check: on-chain slash with reward received; copy-and-steal test result documented.
 1. Redeploy prep (one redeploy, not several): add `slash`, add `limit ≤ 65535` in `enroll`/`changeLimit`, and decide on leaf storage for sync (above).
