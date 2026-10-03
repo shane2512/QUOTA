@@ -82,3 +82,8 @@ Append-only record of what was done, what was observed, and what is still open. 
 - Privy test wallet: `0x9682FD25c31F982FF008b827f195E47b96D6af3a`
 - Dynamic test wallet: `0xb1E9a0311088528F6cD90316a7f3c7E86d43060a`
 - Private keys and API credentials exist only in the gitignored `.env`.
+
+### 2026-10-04 — Vercel fix
+- A Git-triggered build failed ("No Next.js version detected") because the project's Root Directory was `.`. Set Root Directory to `apps/web`, renamed the project to `quota-metro`, redeployed from the repo root (`.vercelignore` excludes `contracts`, `docs`, `pdf`), and aliased `quota-metro.vercel.app`.
+- Turned off Vercel Authentication for this project so the site is public (it was redirecting visitors to a Vercel login).
+- Live: `https://quota-metro.vercel.app` (HTTP 200). Content is mock/demo data. The Git-triggered build with the new Root Directory has not been re-tested yet; it runs on the next push.
