@@ -10,14 +10,14 @@ Window: **1 Oct → 13 Oct** (submit a day early; deadline 14 Oct 09:29 IST). Ph
 Goal: kill unknowns before writing real code.
 
 - [ ] Monorepo, `.env.example`, public GitHub repo, grant `metropolis@hackathon.monad.xyz`.
-- [x] Foundry + Node toolchain. [ ] Deploy hello contract to Monad testnet (blocked: faucet funding, see `docs/gates.md`).
+- [x] Foundry + Node toolchain; hello contract deployed to Monad testnet (`docs/gates.md` G0).
 - [x] Confirm testnet chain ID, RPC, faucet, explorer (`docs/gates.md` G0).
-- [x] **Gate BTX:** no public interface found; **commit–reveal is primary** (provisional, mentor answer still open). See `docs/gates.md` G1.
-- [ ] **Gate Privy:** `personal_sign` deterministic? policy covers what? sign-only works on Monad?
-- [ ] **Gate Dynamic:** one signed Monad tx, sign-only; delegated-access webhook reachable. Fail → drop.
-- [ ] **Gate Cleanverse:** invitation code, read the 3 guides, CVA on testnet, CVI callable on-chain. Fail → drop.
-- [ ] Nansen key and one Profiler call returning data for a Monad address.
-- [ ] Qwen key, model ID, one tool-calling round trip.
+- [x] **Gate BTX:** no public interface found; **commit–reveal is primary** (organizers confirmed BTX unavailable). See `docs/gates.md` G1.
+- [x] **Gate Privy (PASS):** `personal_sign` deterministic? policy covers what? sign-only works on Monad?
+- [x] **Gate Dynamic (PARTIAL):** sign-only Monad tx PASS; delegated-access webhook untested → server-wallet fallback; SDK is Linux/macOS only.
+- [x] **Gate Cleanverse (FAIL → dropped):** no invitation code; only third-party mock addresses found.
+- [x] Nansen: `labels` returns data for a Monad address; `related-wallets`/`counterparties` blocked by credits.
+- [ ] Qwen: DEFERRED by owner (not free). Decide alternative before Phase 7.
 - [ ] Start integrator outreach (parallel, continues to Phase 8).
 - [ ] Community group decision.
 
@@ -43,8 +43,8 @@ Goal: kill unknowns before writing real code.
 
 ## Phase 3 — Slash and BTX path (5–7 Oct)
 - [ ] `slash(a0, limit, receiver)` with leaf recompute and payout.
-- [ ] `SubmitPath`: `commitReveal` (guaranteed) and `btx` (if gate passed).
-- [ ] **Searcher test:** a bot watches the public path and tries to copy the slash. It must fail on the commit–reveal path (and on `btx` if present), and succeed on a naive path (to prove the race is real).
+- [ ] `SubmitPath`: `commitReveal` only (organizers confirmed BTX unavailable).
+- [ ] **Searcher test:** a bot watches the public path and tries to copy the slash. It must fail on the commit–reveal path and succeed on a naive path (to prove the race is real).
 - [ ] Slasher service: violation → queue → slash.
 
 **Exit:** on-chain slash with reward received; copy-and-steal test result documented.
@@ -59,7 +59,7 @@ Goal: kill unknowns before writing real code.
 
 ## Phase 5 — Wallet integrations (7–9 Oct)
 - [ ] **Privy:** operator login, server wallet with owner = operator user, runtime key as additional signer with override policies, secret derivation from signature, sign-only.
-- [ ] **Dynamic:** service login, embedded wallet for rewards, delegated access to the slasher, or server-wallet fallback. (Skip if Phase 0 failed.)
+- [ ] **Dynamic:** server-wallet slasher on Linux (delegated access only if a webhook is proven); service login/embedded wallet for rewards.
 - [ ] Both through `wallets` adapters. Contract and SDK code must not depend on either provider.
 - [ ] Negative test: policy blocks a transaction to any contract other than the registry.
 
@@ -68,7 +68,7 @@ Goal: kill unknowns before writing real code.
 ## Phase 6 — Trust tiers (8–10 Oct) — conditional
 - [ ] **Nansen Screener:** profile a new operator wallet (labels, related wallets, funding, counterparties), sign attestation, Screened tree accepts it; recidivism rule against slashed wallets.
 - [ ] Service console shows tree choice, cluster/concentration stats, slash history.
-- [ ] **Cleanverse Compliant tree** (only if the gate passed): CVA as stake, CVI check before every CVA movement, including slash payout.
+- ~~Cleanverse Compliant tree~~ — cut at Phase 0 (gate failed).
 - [ ] "Remove it and it breaks" check for each: write one test where the tier fails closed without the sponsor component.
 
 **Exit:** a screened enrollment succeeds for a clean wallet and is refused for a related-to-slashed wallet; (if CVI) a non-verified wallet cannot receive CVA. If neither works by 10 Oct, cut and move on.

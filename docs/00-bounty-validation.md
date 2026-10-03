@@ -10,10 +10,10 @@ Verified = read in the sponsor's docs this session. Unverified items are gated i
 |---|---|---|---|---|---|
 | 0 | **Track 4: Trust, Identity & AI Infra** | $10k ×3 | **Core** | The whole project | High |
 | 6 | **Privy** | $5k | **Core** | Agent-side wallet infrastructure + policy engine + secret derivation | High |
-| 1 | **Dynamic** | $5k | **Core** | Service-side wallets: autonomous slasher + reward custody via delegated access | Medium |
-| 5 | **Alibaba Qwen 3.8 Max** | $5k credits | **Core (demo workload)** | The autonomous agent that spends quota; article required | Medium |
+| 1 | **Dynamic** | $5k | **Core (server-wallet; delegated access unproven)** | Service-side wallets: autonomous slasher + reward custody via delegated access | Medium |
+| 5 | **Alibaba Qwen 3.8 Max** | $5k credits | **DEFERRED: not free, decide before Phase 7** | The autonomous agent that spends quota; article required | Medium |
 | 4 | **Nansen** | $5k pool | **Conditional → Phase 6** | Powers the opt-in "Screened" tree (sybil/recidivism screening of stakers) | Low–Medium |
-| 3 | **Cleanverse CVI/CVA** | $2k | **Conditional → Phase 0 gate** | "Compliant" tree: stake held as CVA, moves only between CVI-verified wallets | Unknown (docs gated) |
+| 3 | **Cleanverse CVI/CVA** | $2k | **DROPPED: Phase 0 gate failed (gates.md G4)** | "Compliant" tree: stake held as CVA, moves only between CVI-verified wallets | Unknown (docs gated) |
 | 2 | **Monad Foundation: Community Team** | $5k | **Eligibility only** | None, it's a profile setting | Depends on you |
 
 ### Why each verdict
