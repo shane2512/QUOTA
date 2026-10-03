@@ -104,12 +104,13 @@ p { margin: 0; text-wrap: pretty; }
 .world .loader .bar i { display: block; width: 40%; height: 100%; background: var(--cobalt); animation: board 1.1s var(--ease) infinite; }
 @keyframes board { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
 @media (prefers-reduced-motion: reduce) { .world .loader .bar i { animation: none; width: 100%; opacity: 0.5; } }
-.world .stack { position: relative; min-height: 300px; }
+.world .stack { display: grid; }
 .world .copy { position: absolute; z-index: 5; left: 0; bottom: 0; width: min(520px, 100%); padding: var(--s5) var(--s6) clamp(24px, 7vh, 72px) var(--gutter); background: var(--ground); border-top: 1.5px solid var(--ink); transition: opacity 360ms var(--ease); }
 .world .copy > * { transition: opacity 420ms var(--ease), transform 420ms var(--ease); }
-.world .scene { position: absolute; left: 0; bottom: 0; width: 100%; opacity: 0; transform: translateY(14px); pointer-events: none; }
+.world .scene { grid-area: 1 / 1; align-self: end; width: 100%; opacity: 0; transform: translateY(14px); pointer-events: none; }
 .world .scene[data-on="true"] { opacity: 1; transform: none; pointer-events: auto; }
-.world .scene h2 { margin: var(--s3) 0 var(--s4); }
+.world .scene h2 { margin: 0 0 var(--s4); font-size: clamp(1.75rem, 3.1vw, 2.75rem); }
+@media (max-height: 760px) { .world .scene h2 { font-size: 1.75rem; margin-bottom: var(--s3); } .world .scene li:nth-child(n+2) { display: none; } .world .copy { padding-top: var(--s4); } }
 .world .scene p { color: var(--ink-2); max-width: 40ch; }
 .world .scene ul { list-style: none; padding: 0; margin: var(--s5) 0 0; border-top: 1px solid var(--rule); }
 .world .scene li { padding: var(--s3) 0; border-bottom: 1px solid var(--rule); font-size: 0.9375rem; display: flex; gap: var(--s3); justify-content: space-between; }

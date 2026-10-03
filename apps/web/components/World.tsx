@@ -6,7 +6,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import type { createWorld as CreateWorld } from "./scene3d";
 
 const T_END = 120; // keep in sync with scene3d
-const holdStart = (i: number) => [18, 43, 68, 93][i];
+const holdStart = (i: number) => [18, 42, 66, 90][i];
 
 gsap.registerPlugin(ScrollTrigger);
 

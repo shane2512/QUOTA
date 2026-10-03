@@ -1,4 +1,7 @@
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+
+const rbox = (w: number, h: number, d: number, r = 0.1) => new RoundedBoxGeometry(w, h, d, 3, Math.max(0.01, Math.min(r, Math.min(w, h, d) / 2.2)));
 
 /* QUOTA world: one metro line across a curved ground, four stations built from real geometry.
    Scroll sets a target; the render loop eases toward it, so the camera never depends on scroll-event cadence. */
@@ -23,26 +26,33 @@ const ST = [
 ];
 const U_START = 2.6;
 export const T_END = 120;
-const HOLD = [[15, 26], [40, 51], [65, 76], [90, 101]];
-const HOP = [[26, 40], [51, 65], [76, 90]];
-const sm = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
-const seg = (t: number, a: number, b: number) => sm((t - a) / (b - a));
+const TS = [18, 42, 66, 90]; // dock times; motion never reaches zero velocity
+const DRIFT = 0.35; // units of line per time unit, kept through every dwell
+const mix = (x: number) => 0.3 * x + 0.7 * sm(x); // ease with a non-zero floor on velocity
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const sm = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+const seg = (t: number, a: number, b: number) => Math.max(0, Math.min(1, (t - a) / (b - a)));
 
-/* camera state at abstract time t: u along the line, k = 0 overview .. 1 docked */
+/* camera state at abstract time t: u along the line, k = 0 overview .. 1 docked, az = slow orbit */
 export function stateAt(t: number) {
   let u = U_START, k = 0;
-  const dive = seg(t, 6, 15);
-  k = dive; u = lerp(U_START, ST[0].u, dive);
-  HOP.forEach(([a, b], i) => {
-    const p = seg(t, a, b);
-    if (t >= a) { u = lerp(ST[i].u, ST[i + 1].u, p); k = 1 - 0.7 * Math.sin(Math.PI * Math.min(1, (t - a) / (b - a))); if (t >= b) k = 1; }
-  });
-  if (t > 101) k = 1 - seg(t, 101, 112);
-  return { u, k };
+  if (t < TS[0]) { const d = mix(seg(t, 5, TS[0])); k = d; u = lerp(U_START, ST[0].u, d); }
+  else {
+    let i = 0; while (i < 3 && t >= TS[i + 1]) i++;
+    u = ST[i].u + DRIFT * (t - TS[i]); k = 1;
+    if (i < 3) {
+      const a = TS[i] + 4, b = TS[i + 1] - 4;
+      if (t > a) {
+        const p = mix(seg(t, a, b));
+        if (t < b) { u = lerp(ST[i].u + DRIFT * 4, ST[i + 1].u - DRIFT * 4, p); k = 1 - 0.7 * Math.sin(Math.PI * seg(t, a, b)); }
+        else { u = ST[i + 1].u + DRIFT * (t - TS[i + 1]); k = 1; }
+      }
+    } else if (t > 98) { k = 1 - mix(seg(t, 98, 112)); }
+  }
+  return { u, k, az: 0.2 * Math.sin(t * 0.13) };
 }
-export const sceneOf = (t: number) => (t < 5.5 ? -1 : t >= 108 ? 4 : t < 33 ? 0 : t < 58 ? 1 : t < 83 ? 2 : 3);
-export const holdStart = (i: number) => HOLD[i][0] + 3;
+export const sceneOf = (t: number) => (t < 5.5 ? -1 : t >= 108 ? 4 : t < 30 ? 0 : t < 54 ? 1 : t < 78 ? 2 : 3);
+export const holdStart = (i: number) => TS[i];
 
 function tex(w: number, h: number, draw: (c: CanvasRenderingContext2D) => void) {
   const cv = document.createElement("canvas");
@@ -102,13 +112,13 @@ export function createWorld(canvas: HTMLCanvasElement, opts: { onScene: (i: numb
     const h = 0.4 + rnd() * rnd() * (1.4 + far * 2.2);
     cells.push(new THREE.Matrix4().compose(new THREE.Vector3(bx, h / 2, bz), new THREE.Quaternion(), new THREE.Vector3(1.4 + rnd() * 0.9, h, 1.4 + rnd() * 0.9)));
   }
-  const blocks = new THREE.InstancedMesh(geo(new THREE.BoxGeometry(1, 1, 1)), std(C.block, { roughness: 0.9 }), cells.length);
+  const blocks = new THREE.InstancedMesh(geo(rbox(1, 1, 1, 0.16)), std(C.block, { roughness: 0.9 }), cells.length);
   cells.forEach((m, i) => blocks.setMatrixAt(i, m));
   scene.add(blocks);
 
   // the line: instanced ribbon, recoloured as the train passes
   const STEP = 0.6, N = Math.ceil(TOTAL / STEP);
-  const ribbon = new THREE.InstancedMesh(geo(new THREE.BoxGeometry(STEP * 1.04, 0.3, 1.5)), std(0xffffff, { roughness: 0.5 }), N);
+  const ribbon = new THREE.InstancedMesh(geo(rbox(STEP * 1.04, 0.3, 1.5)), std(0xffffff, { roughness: 0.5 }), N);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color();
   for (let i = 0; i < N; i++) {
     const [x, z] = pathPt(i * STEP), [x2, z2] = pathPt(i * STEP + 0.1);
@@ -127,8 +137,8 @@ export function createWorld(canvas: HTMLCanvasElement, opts: { onScene: (i: numb
 
   // train: the brand roundel, standing
   const train = new THREE.Group();
-  mesh(geo(new THREE.TorusGeometry(0.9, 0.22, 16, 40)), std(C.cobalt), 0, 1.1, 0, train);
-  mesh(geo(new THREE.BoxGeometry(2.7, 0.42, 0.34)), std(C.ink), 0, 1.1, 0, train);
+  mesh(geo(new THREE.TorusGeometry(0.9, 0.22, 28, 72)), std(C.cobalt), 0, 1.1, 0, train);
+  mesh(geo(rbox(2.7, 0.42, 0.34)), std(C.ink), 0, 1.1, 0, train);
   scene.add(train);
 
   /* ---- stations ---- */
@@ -139,14 +149,17 @@ export function createWorld(canvas: HTMLCanvasElement, opts: { onScene: (i: numb
     c.fillStyle = "#46515c"; c.font = '500 32px "JetBrains Mono Variable", monospace'; c.fillText(sub, 28, 170);
   });
   const sign = (name: string) => {
-    const t = tex(1024, 256, (c) => { c.fillStyle = "#0d1217"; c.fillRect(0, 0, 1024, 256); c.fillStyle = "#f3f5f7"; c.font = '800 168px "Archivo Variable", sans-serif'; c.textBaseline = "middle"; c.fillText(name, 56, 140); });
+    const t = tex(1024, 256, (c) => { c.fillStyle = "#ffffff"; c.fillRect(0, 0, 1024, 256); c.fillStyle = "#1b4fd8"; c.fillRect(0, 226, 1024, 30); c.fillStyle = "#0d1217"; c.font = '800 168px "Archivo Variable", sans-serif'; c.textBaseline = "middle"; c.fillText(name, 56, 140); });
     const g = new THREE.Group();
-    mesh(geo(new THREE.PlaneGeometry(6.2, 1.55)), new THREE.MeshBasicMaterial({ map: t }), 0, 0, 0.12, g);
-    mesh(geo(new THREE.BoxGeometry(6.3, 1.65, 0.1)), std(C.ink), 0, 0, 0, g);
+    // one slab, lettering on its front face only, so nothing can sit in front of the word
+    const edge = new THREE.MeshBasicMaterial({ color: C.ink });
+    mesh(geo(new THREE.BoxGeometry(6.3, 1.65, 0.16)), [edge, edge, edge, edge, new THREE.MeshBasicMaterial({ map: t }), edge] as unknown as THREE.Material, 0, 0, 0, g);
     return g;
   };
+  const shadowTex = tex(256, 256, (c) => { const gr = c.createRadialGradient(128, 128, 20, 128, 128, 128); gr.addColorStop(0, "rgba(13,18,23,0.34)"); gr.addColorStop(1, "rgba(13,18,23,0)"); c.fillStyle = gr; c.fillRect(0, 0, 256, 256); });
   const platform = (g: THREE.Group) => {
-    mesh(geo(new THREE.CylinderGeometry(5.6, 5.8, 0.5, 64)), std(C.paper), 0, 0.25, -2.2, g);
+    mesh(geo(new THREE.PlaneGeometry(15, 15)).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }), 0, 0.02, -2.2, g);
+    mesh(geo(new THREE.CylinderGeometry(5.6, 5.8, 0.5, 72)), std(C.paper), 0, 0.25, -2.2, g);
     mesh(geo(new THREE.TorusGeometry(5.65, 0.1, 8, 72)).rotateX(Math.PI / 2), std(C.ink), 0, 0.5, -2.2, g);
   };
   const station = (i: number) => {
@@ -154,52 +167,53 @@ export function createWorld(canvas: HTMLCanvasElement, opts: { onScene: (i: numb
     g.position.set(ST[i].x, 0, ST[i].z);
     platform(g);
     const s = sign(["STAKE", "PROVE", "CHECK", "SLASH"][i]);
-    s.scale.setScalar(0.72); s.position.set(3.6, 0.85, 3.4); g.add(s);
+    s.position.set(0, 7.5, -2.4); g.add(s);
+    [-2.7, 2.7].forEach((x) => mesh(geo(new THREE.CylinderGeometry(0.1, 0.1, 6.6, 20)), std(C.ink), x, 3.8, -2.4, g));
     const o = new THREE.Group(); o.position.set(0, 0.5, -2.2); g.add(o);
     const anim: ((t: number) => void)[] = [];
     if (i === 0) { // passkey terminal + deposit stack
-      mesh(geo(new THREE.BoxGeometry(2.2, 4, 1.1)), std(C.ink), -2.4, 2, 0, o);
+      mesh(geo(rbox(2.2, 4, 1.1)), std(C.ink), -2.4, 2, 0, o);
       const scr = tex(256, 256, (c) => { c.fillStyle = "#1b2631"; c.fillRect(0, 0, 256, 256); c.strokeStyle = "#0f9d6b"; c.lineWidth = 12; c.lineCap = "round"; [30, 52, 74].forEach((r) => { c.beginPath(); c.arc(128, 150, r, Math.PI * 1.1, Math.PI * 1.9); c.stroke(); }); c.fillStyle = "#e8edf1"; c.font = '700 40px "JetBrains Mono Variable", monospace'; c.textAlign = "center"; c.fillText("TAP", 128, 232); });
       mesh(geo(new THREE.PlaneGeometry(1.7, 1.7)), new THREE.MeshBasicMaterial({ map: scr }), -2.4, 3, 0.57, o);
       const coins = new THREE.Group(); coins.position.set(2.3, 0, 0); o.add(coins);
-      for (let k = 0; k < 7; k++) mesh(geo(new THREE.CylinderGeometry(1.35, 1.35, 0.32, 40)), std(C.amber, { metalness: 0.55, roughness: 0.32 }), 0, 0.2 + k * 0.36, 0, coins);
+      for (let k = 0; k < 7; k++) mesh(geo(new THREE.CylinderGeometry(1.35, 1.35, 0.32, 72)), std(C.amber, { metalness: 0.55, roughness: 0.32 }), 0, 0.2 + k * 0.36, 0, coins);
       mesh(geo(new THREE.PlaneGeometry(3.2, 1.6)), new THREE.MeshBasicMaterial({ map: textMap("10 MON", "100 / epoch"), transparent: true }), 0.2, 3.9, 0.2, o).rotation.y = 0;
       anim.push((t) => { coins.rotation.y = t * 0.5; });
     } else if (i === 1) { // shielded member + request ticket
-      mesh(geo(new THREE.SphereGeometry(1.15, 32, 24)), std(C.steel), -2.5, 2.9, 0, o);
+      mesh(geo(new THREE.SphereGeometry(1.15, 64, 48)), std(C.steel), -2.5, 2.9, 0, o);
       mesh(geo(new THREE.CapsuleGeometry(1.25, 1.4, 8, 20)), std(C.steel), -2.5, 0.95, 0, o);
       const hatch = tex(256, 256, (c) => { c.fillStyle = "rgba(243,245,247,0.85)"; c.fillRect(0, 0, 256, 256); c.strokeStyle = "#0d1217"; c.lineWidth = 7; for (let k = -256; k < 512; k += 28) { c.beginPath(); c.moveTo(k, 256); c.lineTo(k + 256, 0); c.stroke(); } });
-      const shield = mesh(geo(new THREE.SphereGeometry(2.55, 40, 28)), new THREE.MeshStandardMaterial({ map: hatch, transparent: true, opacity: 0.55, roughness: 0.4, depthWrite: false }), -2.5, 2.2, 0, o);
+      const shield = mesh(geo(new THREE.SphereGeometry(2.55, 64, 48)), new THREE.MeshStandardMaterial({ map: hatch, transparent: true, opacity: 0.55, roughness: 0.4, depthWrite: false }), -2.5, 2.2, 0, o);
       anim.push((t) => { shield.rotation.y = t * 0.25; });
       const ticket = new THREE.Group(); ticket.position.set(2.5, 2.6, 0); o.add(ticket);
-      mesh(geo(new THREE.BoxGeometry(3.9, 2.4, 0.22)), std(0xffffff), 0, 0, 0, ticket);
+      mesh(geo(rbox(3.9, 2.4, 0.22)), std(0xffffff), 0, 0, 0, ticket);
       mesh(geo(new THREE.PlaneGeometry(3.7, 1.85)), new THREE.MeshBasicMaterial({ map: textMap("k = 7", "of N = 100") }), 0, 0.05, 0.12, ticket);
-      mesh(geo(new THREE.BoxGeometry(3.7, 0.22, 0.26)), std(C.cobalt), 0, -1.0, 0.02, ticket);
+      mesh(geo(rbox(3.7, 0.22, 0.26)), std(C.cobalt), 0, -1.0, 0.02, ticket);
       anim.push((t) => { ticket.rotation.y = Math.sin(t * 0.7) * 0.18; ticket.position.y = 2.6 + Math.sin(t * 1.1) * 0.12; });
     } else if (i === 2) { // gate that verifies, two unlinkable tickets
-      [-1.55, 1.55].forEach((x) => mesh(geo(new THREE.BoxGeometry(0.7, 4.6, 0.9)), std(C.ink), x + 1.9, 2.3, 0, o));
-      mesh(geo(new THREE.BoxGeometry(4.8, 0.7, 0.9)), std(C.ink), 1.9, 4.6, 0, o);
-      const ring = mesh(geo(new THREE.TorusGeometry(0.9, 0.18, 16, 48)), std(C.leaf, { emissive: C.leaf, emissiveIntensity: 0.35 }), 1.9, 2.55, 0.1, o);
-      const k1 = mesh(geo(new THREE.BoxGeometry(0.32, 1.1, 0.2)), std(C.leaf, { emissive: C.leaf, emissiveIntensity: 0.35 }), 1.62, 2.4, 0.12, o); k1.rotation.z = Math.PI / 4;
-      const k2 = mesh(geo(new THREE.BoxGeometry(0.32, 1.9, 0.2)), std(C.leaf, { emissive: C.leaf, emissiveIntensity: 0.35 }), 2.2, 2.7, 0.12, o); k2.rotation.z = -Math.PI / 4;
+      [-1.55, 1.55].forEach((x) => mesh(geo(rbox(0.7, 4.6, 0.9)), std(C.ink), x + 1.9, 2.3, 0, o));
+      mesh(geo(rbox(4.8, 0.7, 0.9)), std(C.ink), 1.9, 4.6, 0, o);
+      const ring = mesh(geo(new THREE.TorusGeometry(0.9, 0.18, 28, 72)), std(C.leaf, { emissive: C.leaf, emissiveIntensity: 0.35 }), 1.9, 2.55, 0.1, o);
+      const k1 = mesh(geo(rbox(0.32, 1.1, 0.2)), std(C.leaf, { emissive: C.leaf, emissiveIntensity: 0.35 }), 1.62, 2.4, 0.12, o); k1.rotation.z = Math.PI / 4;
+      const k2 = mesh(geo(rbox(0.32, 1.9, 0.2)), std(C.leaf, { emissive: C.leaf, emissiveIntensity: 0.35 }), 2.2, 2.7, 0.12, o); k2.rotation.z = -Math.PI / 4;
       anim.push((t) => { ring.rotation.z = t * 0.6; });
       [[-3.4, 3.6, "0x91c2…07fe", "k = 3"], [-3.4, 1.4, "0x3ae7…b2d9", "k = 41"]].forEach(([x, y, a, b]) => {
         const tk = new THREE.Group(); tk.position.set(x as number, y as number, 0); o.add(tk);
-        mesh(geo(new THREE.BoxGeometry(3.1, 1.6, 0.2)), std(0xffffff), 0, 0, 0, tk);
+        mesh(geo(rbox(3.1, 1.6, 0.2)), std(0xffffff), 0, 0, 0, tk);
         mesh(geo(new THREE.PlaneGeometry(2.95, 1.45)), new THREE.MeshBasicMaterial({ map: tex(512, 256, (c) => { c.fillStyle = "#fff"; c.fillRect(0, 0, 512, 256); c.fillStyle = "#0d1217"; c.font = '700 50px "JetBrains Mono Variable", monospace'; c.fillText(a as string, 20, 110); c.fillStyle = "#46515c"; c.font = '500 38px "JetBrains Mono Variable", monospace'; c.fillText(b as string, 20, 180); }) }), 0, 0, 0.11, tk);
       });
     } else { // two shares, one line: the secret falls out
       const pts: [number, number][] = [[-3.2, 0.8], [-0.6, 2.5], [2.2, 4.3]];
       pts.forEach(([x, y], k) => mesh(geo(new THREE.SphereGeometry(k === 0 ? 0.42 : 0.36, 24, 18)), std(k === 0 ? C.signal : C.ink, k === 0 ? { emissive: C.signal, emissiveIntensity: 0.3 } : {}), x, y, 0, o));
-      const len = Math.hypot(5.4, 3.5), line = mesh(geo(new THREE.CylinderGeometry(0.1, 0.1, len + 1.5, 12)), std(C.signal), -0.5, 2.55, 0, o);
+      const len = Math.hypot(5.4, 3.5), line = mesh(geo(new THREE.CylinderGeometry(0.1, 0.1, len + 1.5, 24)), std(C.signal), -0.5, 2.55, 0, o);
       line.rotation.z = Math.atan2(3.5, 5.4) - Math.PI / 2;
-      mesh(geo(new THREE.BoxGeometry(6.4, 0.18, 0.18)), std(C.ink), 0, 0.1, 0, o);
-      mesh(geo(new THREE.BoxGeometry(0.18, 5, 0.18)), std(C.ink), -3.5, 2.5, 0, o);
+      mesh(geo(rbox(6.4, 0.18, 0.18)), std(C.ink), 0, 0.1, 0, o);
+      mesh(geo(rbox(0.18, 5, 0.18)), std(C.ink), -3.5, 2.5, 0, o);
       const keyG = new THREE.Group(); keyG.position.set(4.3, 2.4, 0); o.add(keyG);
-      mesh(geo(new THREE.TorusGeometry(0.75, 0.2, 16, 36)), std(C.signal, { metalness: 0.4, roughness: 0.3 }), 0, 0.9, 0, keyG);
-      mesh(geo(new THREE.BoxGeometry(0.28, 2.2, 0.28)), std(C.signal, { metalness: 0.4, roughness: 0.3 }), 0, -0.55, 0, keyG);
-      mesh(geo(new THREE.BoxGeometry(0.8, 0.26, 0.26)), std(C.signal, { metalness: 0.4, roughness: 0.3 }), 0.4, -1.25, 0, keyG);
-      const flying: THREE.Mesh[] = [0, 1, 2].map((k) => mesh(geo(new THREE.CylinderGeometry(0.62, 0.62, 0.2, 32)), std(C.amber, { metalness: 0.55, roughness: 0.32 }), 0, 0, 0, o));
+      mesh(geo(new THREE.TorusGeometry(0.75, 0.2, 28, 64)), std(C.signal, { metalness: 0.4, roughness: 0.3 }), 0, 0.9, 0, keyG);
+      mesh(geo(rbox(0.28, 2.2, 0.28)), std(C.signal, { metalness: 0.4, roughness: 0.3 }), 0, -0.55, 0, keyG);
+      mesh(geo(rbox(0.8, 0.26, 0.26)), std(C.signal, { metalness: 0.4, roughness: 0.3 }), 0.4, -1.25, 0, keyG);
+      const flying: THREE.Mesh[] = [0, 1, 2].map((k) => mesh(geo(new THREE.CylinderGeometry(0.62, 0.62, 0.2, 72)), std(C.amber, { metalness: 0.55, roughness: 0.32 }), 0, 0, 0, o));
       anim.push((t) => { keyG.rotation.y = t * 0.8; flying.forEach((c, k) => { const p = (t * 0.35 + k / 3) % 1; c.position.set(lerp(-1.2, 5.2, p), 0.5 + Math.sin(p * Math.PI) * 2.4, 1.6); c.rotation.set(t * 3 + k, 0, t * 2); }); });
     }
     return { g, anim };
@@ -211,9 +225,9 @@ export function createWorld(canvas: HTMLCanvasElement, opts: { onScene: (i: numb
   let target = 0, cur = 0, w = 1, h = 1, raf = 0, running = false, lastScene = -2, last = performance.now();
   const OVC = new THREE.Vector3(33.5, 0, 19.5);
   const dirO = new THREE.Vector3(0, 0.8, 0.6).normalize(), dirD = new THREE.Vector3(0.3, 0.36, 0.88).normalize();
-  const v = new THREE.Vector3(), f = new THREE.Vector3();
+  const v = new THREE.Vector3(), f = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
   const place = () => {
-    const t = cur * T_END, { u, k } = stateAt(t);
+    const t = cur * T_END, { u, k, az } = stateAt(t);
     const [px, pz] = pathPt(u);
     train.position.set(px, 0, pz);
     const [qx, qz] = pathPt(u + 0.2);
@@ -224,7 +238,7 @@ export function createWorld(canvas: HTMLCanvasElement, opts: { onScene: (i: numb
     f.set(lerp(OVC.x, px, kk), lerp(OVC.y, 3.6, kk), lerp(OVC.z, pz - 2.2, kk));
     const distO = wide ? 100 : 150, distD = wide ? 23 : 34;
     const dist = Math.exp(lerp(Math.log(distO), Math.log(distD), kk));
-    v.copy(dirO).lerp(dirD, kk).normalize().multiplyScalar(dist).add(f);
+    v.copy(dirO).lerp(dirD, kk).normalize().applyAxisAngle(Y, az * kk).multiplyScalar(dist).add(f);
     camera.position.copy(v); camera.lookAt(f);
     // keep the subject clear of the copy column on wide screens, above it on phones
     if (wide) camera.setViewOffset(w, h, -w * (0.05 + 0.08 * kk), h * 0.02 * kk, w, h); else camera.setViewOffset(w, h, 0, h * 0.2 * kk, w, h);
