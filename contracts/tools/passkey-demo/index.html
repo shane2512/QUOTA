@@ -1,0 +1,68 @@
+<!doctype html><meta charset=utf-8><title>QUOTA passkey dev tool</title>
+<body style="font:14px system-ui;max-width:760px;margin:2rem auto">
+<h3>QUOTA passkey dev tool (localhost only)</h3>
+<p>registry <code id=reg></code><br>operator <code id=op></code></p>
+<button id=create>1. Create passkey</button>
+<button id=register>2. Sign registerPasskey</button>
+<button id=enroll>3. Sign enroll (limit 1)</button>
+<pre id=out></pre>
+<script type=module>
+import { encodeAbiParameters, keccak256, createPublicClient, http, toHex, hexToBytes, bytesToHex } from "https://esm.sh/viem@2";
+const REGISTRY = "__REGISTRY__", OPERATOR = "__OPERATOR__", RPC = "https://testnet-rpc.monad.xyz", CHAIN = 10143;
+const A = { register: 0, enroll: 1 };
+reg.textContent = REGISTRY; op.textContent = OPERATOR;
+const log = (...a) => (out.textContent += a.join(" ") + "\n");
+const client = createPublicClient({ transport: http(RPC) });
+const abi = [{ name: "passkeyNonce", type: "function", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] }];
+const b64u = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const unb64u = s => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+const save = (n, o) => fetch("/save/" + n, { method: "POST", body: JSON.stringify(o, null, 1) });
+const N = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551n;
+
+create.onclick = async () => {
+  const cred = await navigator.credentials.create({ publicKey: {
+    rp: { id: "localhost", name: "QUOTA dev" },
+    user: { id: crypto.getRandomValues(new Uint8Array(16)), name: "operator", displayName: "operator" },
+    challenge: crypto.getRandomValues(new Uint8Array(32)),
+    pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+    authenticatorSelection: { residentKey: "preferred", userVerification: "required" },
+  }});
+  const spki = new Uint8Array(cred.response.getPublicKey());
+  const xy = bytesToHex(spki.slice(-64));
+  localStorage.cred = JSON.stringify({ id: b64u(cred.rawId), x: "0x" + xy.slice(2, 66), y: "0x" + xy.slice(66) });
+  log("created", localStorage.cred);
+};
+
+async function assertion(action, params) {
+  const c = JSON.parse(localStorage.cred);
+  const nonce = await client.readContract({ address: REGISTRY, abi, functionName: "passkeyNonce", args: [OPERATOR] });
+  const challenge = keccak256(encodeAbiParameters(
+    [{ type: "uint256" }, { type: "address" }, { type: "address" }, { type: "uint8" }, { type: "bytes32" }, { type: "uint256" }],
+    [BigInt(CHAIN), REGISTRY, OPERATOR, A[action], keccak256(params), nonce]));
+  const got = await navigator.credentials.get({ publicKey: {
+    challenge: hexToBytes(challenge), rpId: "localhost", userVerification: "required",
+    allowCredentials: [{ type: "public-key", id: unb64u(c.id) }],
+  }});
+  const sig = new Uint8Array(got.response.signature);
+  let i = 2, rl = sig[3]; let r = sig.slice(4, 4 + rl); i = 4 + rl + 1; const sl = sig[i]; let s = sig.slice(i + 1, i + 1 + sl);
+  let rv = BigInt(bytesToHex(r)), sv = BigInt(bytesToHex(s));
+  if (sv > N / 2n) sv = N - sv;
+  return { nonce: nonce.toString(), challenge, x: c.x, y: c.y,
+    authenticatorData: bytesToHex(new Uint8Array(got.response.authenticatorData)),
+    clientDataJSON: new TextDecoder().decode(got.response.clientDataJSON),
+    r: rv.toString(), s: sv.toString() };
+}
+
+register.onclick = async () => {
+  const c = JSON.parse(localStorage.cred);
+  const a = await assertion("register", encodeAbiParameters([{ type: "uint256" }, { type: "uint256" }], [BigInt(c.x), BigInt(c.y)]));
+  await save("register", a); log("saved register", JSON.stringify(a));
+};
+enroll.onclick = async () => {
+  const id = BigInt(bytesToHex(crypto.getRandomValues(new Uint8Array(31)))); const limit = 1n, value = 10n ** 16n; // UNIT = 0.01 MON
+  const a = await assertion("enroll", encodeAbiParameters(
+    [{ type: "uint256" }, { type: "uint64" }, { type: "uint256" }, { type: "uint256" }], [id, limit, 0n, value]));
+  a.idCommitment = id.toString(); a.limit = "1"; a.value = value.toString();
+  await save("enroll", a); log("saved enroll", JSON.stringify(a));
+};
+</script>
