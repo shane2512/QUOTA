@@ -4,15 +4,15 @@
 ///   → server recovers the secret → slasher commit → reveal → reward lands at the receiver.
 /// Env: MONAD_RPC_URL, QUOTA_REGISTRY_ADDRESS, DEPLOYER_PRIVATE_KEY (funds the actors), SLASHER_PRIVATE_KEY,
 ///      WEBAUTHN_RP_ID, PASSKEY_ORIGIN (default http://localhost:3777).
-/// Run: pnpm --filter @quota/slasher phase3   (reads ../../.env)
+/// Run: pnpm --filter @quota/devtools phase3   (reads ../../.env)
 import { randomBytes } from "node:crypto";
 import { createPublicClient, encodeAbiParameters, encodeFunctionData, formatEther, http, type Address, type Hex } from "viem";
 import { generatePrivateKey, privateKeyToAddress } from "viem/accounts";
 import { QuotaClient } from "@quota/client";
 import { MemberState, fetchTree, identityCommitment, loadArtifacts, registryAbi } from "@quota/core";
 import { QuotaVerifier, RegistryRootChecker, type Violation } from "@quota/server";
-import { Broadcaster, CommitRevealPath, LocalKeyWallet, Slasher, type SlashOutcome, type Sent } from "../src/index.ts";
-import { Action, SoftPasskey } from "./soft-passkey.ts";
+import { Broadcaster, CommitRevealPath, LocalKeyWallet, Slasher, type SlashOutcome, type Sent } from "@quota/slasher";
+import { Action, SoftPasskey } from "../src/index.ts";
 
 process.loadEnvFile?.(new URL("../../../.env", import.meta.url).pathname);
 const need = (k: string) => {

@@ -2,10 +2,13 @@
   "name": "quota",
   "private": true,
   "packageManager": "pnpm@11.25.0",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "test": "pnpm --filter \"./packages/*\" -r test",
-    "typecheck": "pnpm --filter \"./packages/*\" -r typecheck",
-    "phase2": "pnpm --filter @quota/server phase2"
+    "typecheck": "pnpm --filter \"./packages/*\" --filter \"./apps/demo-mcp\" -r typecheck",
+    "phase2": "pnpm --filter @quota/server phase2",
+    "phase3": "pnpm --filter @quota/devtools phase3"
   }
 }

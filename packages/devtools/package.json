@@ -1,0 +1,27 @@
+{
+  "name": "@quota/devtools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "TEST TOOLING ONLY: software passkey and scripted enrollment for local/testnet demos.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "enroll-agent": "tsx scripts/enroll-agent.ts",
+    "phase3": "tsx scripts/phase3-e2e.ts"
+  },
+  "dependencies": {
+    "@quota/client": "workspace:*",
+    "@quota/core": "workspace:*",
+    "@quota/slasher": "workspace:*",
+    "viem": "^2.57.2",
+    "@quota/server": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

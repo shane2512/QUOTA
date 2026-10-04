@@ -8,16 +8,13 @@
   },
   "scripts": {
     "test": "tsx --test test/*.test.ts",
-    "typecheck": "tsc --noEmit",
-    "phase3": "tsx scripts/phase3-e2e.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@quota/core": "workspace:*",
     "viem": "^2.57.2"
   },
   "devDependencies": {
-    "@quota/client": "workspace:*",
-    "@quota/server": "workspace:*",
     "@types/node": "^26.6.4",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
