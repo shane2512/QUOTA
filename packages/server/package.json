@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./sqlite": "./src/sqlite.ts"
   },
   "scripts": {
     "test": "tsx --test test/*.test.ts",
@@ -20,6 +21,11 @@
     "@quota/client": "workspace:*",
     "@types/node": "^26.6.4",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "express": "^5.2.1",
+    "@types/express": "^5.0.6",
+    "hono": "4.13.12",
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "zod": "^4.6.5"
   }
 }

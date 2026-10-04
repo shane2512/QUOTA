@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@quota/core": "workspace:*",
-    "snarkjs": "^0.7.6"
+    "snarkjs": "^0.7.6",
+    "viem": "^2.57.2"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",

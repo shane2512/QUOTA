@@ -1,3 +1,5 @@
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import * as snarkjs from "snarkjs";
 import {
   MAX_LIMIT,
@@ -33,6 +35,49 @@ export interface QuotaClientOptions {
   now?: () => number; // unix seconds
   /// Demo only (PRD D3): keep sending past the limit by reusing message ids, which leaks the secret.
   allowOveruse?: boolean;
+  /// Where used message ids are counted. Default: memory. Use FileUsageStore for any agent that may restart
+  /// within an epoch: a restarted agent that forgets its count would reuse ids and get itself slashed.
+  usage?: UsageStore;
+}
+
+/// Next unused message id per `${serverId}|${epoch}`. set() must persist before returning.
+export interface UsageStore {
+  get(key: string): bigint | undefined;
+  set(key: string, next: bigint): void;
+}
+
+export class MemoryUsageStore implements UsageStore {
+  #m = new Map<string, bigint>();
+  get(key: string) {
+    return this.#m.get(key);
+  }
+  set(key: string, next: bigint) {
+    this.#m.set(key, next);
+  }
+}
+
+/// JSON file, written synchronously on every increment (before the proof is made). Node only.
+export class FileUsageStore implements UsageStore {
+  #m: Map<string, bigint>;
+  constructor(private path: string) {
+    mkdirSync(dirname(path), { recursive: true });
+    let o: Record<string, string> = {};
+    try {
+      o = JSON.parse(readFileSync(path, "utf8"));
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    }
+    this.#m = new Map(Object.entries(o).map(([k, v]) => [k, BigInt(v)]));
+  }
+  get(key: string) {
+    return this.#m.get(key);
+  }
+  set(key: string, next: bigint) {
+    this.#m.set(key, next);
+    const tmp = `${this.path}.tmp`;
+    writeFileSync(tmp, JSON.stringify(Object.fromEntries([...this.#m].map(([k, v]) => [k, v.toString()]))));
+    renameSync(tmp, this.path);
+  }
 }
 
 /// @quota/client (PRD S1): attaches an RLN-v2 proof to each request and tracks message ids per server and epoch.
@@ -41,13 +86,14 @@ export class QuotaClient {
   readonly leaf: bigint;
   #secret: bigint;
   #opts: QuotaClientOptions;
-  #used = new Map<string, bigint>(); // `${serverId}|${epoch}` → next message id
+  #used: UsageStore;
 
   constructor(opts: QuotaClientOptions) {
     if (opts.secret <= 0n || opts.secret >= SNARK_FIELD) throw new Error("secret out of field range");
     if (opts.limit <= 0n || opts.limit > MAX_LIMIT) throw new Error(`limit must be in 1..${MAX_LIMIT}`);
     this.#secret = opts.secret;
     this.#opts = opts;
+    this.#used = opts.usage ?? new MemoryUsageStore();
     this.idCommitment = identityCommitment(opts.secret);
     this.leaf = rateCommitment(this.idCommitment, opts.limit);
   }
@@ -105,3 +151,5 @@ export class QuotaClient {
     return { idCommitment: this.idCommitment.toString(), limit: this.#opts.limit.toString() };
   }
 }
+
+export * from "./helpers.ts";
