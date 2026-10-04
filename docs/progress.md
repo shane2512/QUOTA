@@ -10,7 +10,7 @@ Append-only record of what was done, what was observed, and what is still open. 
 | 1 Contracts: custody and registry | Done (v2 verified on Sourcify; enroll gas measured on Monad) | real passkey verified on testnet (v1) |
 | 2 RLN proofs | Done (on-chain root proof closed in Phase 3 e2e) | `pnpm phase2` all PASS |
 | 3 Slash (commit–reveal) | Done | `pnpm --filter @quota/slasher phase3` all PASS on Monad testnet; forge 84 passed |
-| 4 SDKs, middleware, demo MCP | Not started | |
+| 4 SDKs, middleware, demo MCP | Done (human-stranger timing and named integrator still open) | clean-checkout quickstart 401 → 200 in 28 s machine time; 26 package tests + forge 84 green |
 | 5 Wallet integrations | Not started | |
 | 6 Trust tiers (Nansen only) | Not started | |
 | 7 Scout agent, consoles, deploy | Not started | |
@@ -72,13 +72,23 @@ Append-only record of what was done, what was observed, and what is still open. 
 | `SubmitPath` exposes `slash(req)` rather than a generic `send(tx)` (PRD B1) | Commit–reveal is a two-transaction protocol; the interface hides that |
 | e2e uses a software P-256 authenticator (`scripts/soft-passkey.ts`) | Lets the slash e2e run unattended; labelled test tooling, never a passkey claim. Hardware passkey proven in Phase 1 |
 | New env var `SLASHER_PRIVATE_KEY` (throwaway testnet signer, used by the e2e) | `LocalKeyWallet` until Phase 5 wallet adapters; added to `.env.example` |
+| Request binding: `x = hashToField(keccak256("QUOTA/http/v1\nMETHOD\npath?query\nbody"))`, JSON bodies canonicalised (sorted keys); MCP: `"QUOTA/mcp-tool/v1\ntool\ncanonical(args)"` | One definition in `@quota/core` so client and server cannot drift; domain-separated so an HTTP proof is never a valid MCP proof |
+| MCP proof travels in `params._meta["quota/proof"]` | Transport-agnostic (stdio, Streamable HTTP); the SDK passes it to handlers as `extra._meta` |
+| Rejections: 401 (missing/invalid/unknown root/bad payload/epoch), 409 replay, 429 violation; MCP returns a tool error with the same reason | Distinguishes "not allowed" from "over quota" |
+| Client message-id counts are persistent (`FileUsageStore`, written before proving) | Found while building the demo: an honest agent restarted within an epoch would reuse id 0 and slash itself |
+| `SqliteNullifierStore` on `node:sqlite` (Node ≥ 22.13), separate export `@quota/server/sqlite` | No new dependency; servers that don't use it don't load the experimental module |
+| Agent secret `a0 = hashToField(signature over "QUOTA/rln-secret/v1")` (`deriveSecret`, PRD W2) | Recoverable from the wallet, never stored; same message as the Privy gate test |
+| New package `@quota/devtools` (software passkey, scripted enroll, Phase 3 e2e moved here) | Test tooling kept out of the SDK; moving the e2e avoids a slasher↔devtools cycle |
+| `hono` pinned to 4.13.12 | 4.13.13 (published 2026-10-04) fails pnpm's minimum-release-age policy; I did not add a policy exemption |
+| New env vars `AGENT_PRIVATE_KEY`, `AGENT_LIMIT` | Demo agent; in `.env.example` |
 
 ## Open items
 
 **Owner decisions or actions**
 - Qwen: credits, open-weight, or drop (before Phase 7).
 - Nansen credits (otherwise Screener is labels-only).
-- Named external integrator (flag due by Phase 4).
+- **Named external integrator: due now (Phase 4 is done).**
+- A human stranger to time the service quickstart (agent-run clean checkout passed).
 - Final public domain for passkeys (before Phase 7).
 - Cleanverse invitation code, only if reopening.
 - Community group, or skip.
@@ -166,3 +176,36 @@ Append-only record of what was done, what was observed, and what is still open. 
   2. The freshly funded operator's first tx was rejected with "Signer had insufficient balance": consensus checks balances against lagging state. Fixed: wait 4 blocks after funding. The sweep worked (0.475 MON returned).
 - **Re-ran everything after the changes:** `pnpm typecheck` clean; `pnpm test` core 9, server 5, slasher 3 passed; `pnpm phase2` all PASS against v1 (the event sync now took 234 s for 272,700 blocks, which is why v2 has `leaves()`). Proving on this run: median 705 ms (min 591, max 1421, n=10); verify median 16 ms.
 - Balances after: deployer 0.586 MON, slasher 0.016 MON (needs topping up before another slash), receiver 0.015 MON.
+
+### 2026-10-05 — Phase 4: SDKs, middleware, demo MCP server
+- Pulled `f7e6d84` (owner's independent Phase 3 re-verification).
+- **Core:** `canonicalJson`, `httpPayloadHash`, `toolPayloadHash`, `MCP_META_KEY`.
+- **Client:**
+  - `deriveSecret`, `RegistryMembership` (tree cache via `leaves()`, 60 s max age), `quotaFetch`, `quotaToolMeta`.
+  - `UsageStore` with `MemoryUsageStore` and `FileUsageStore`.
+- **Server:** `quotaExpress`, `quotaHono`, `quotaTool` (MCP), `statusFor`, `SqliteNullifierStore`.
+- **Tests:** `pnpm test` → core 12, client 2, server 9, slasher 3 = **26 passed**.
+  - New tests use real Groth16 proofs through real Express 5, Hono and MCP SDK 1.32 (`InMemoryTransport`).
+  - Covered: ok; replay 409; missing 401; tampered body 401 `bad-payload`; violation 429 with exact secret recovery; Hono GET with query; MCP missing proof and wrong arguments; SQLite store catching a violation across a restart; canonical-JSON and domain-separation vectors; deterministic `deriveSecret`; `FileUsageStore` restart.
+  - `pnpm typecheck` clean (6 projects). `forge test` 84 passed.
+- **apps/demo-mcp:** stateless Streamable HTTP MCP server with `web_search` over live Wikipedia, REST twin `GET /api/search`, SQLite nullifiers, and optional slashing (`QUOTA_SLASH=1`). Demo agent with a persistent usage file and `--cheat`.
+- **Anvil rehearsal** (`--hardfork osaka --block-time 1`, public anvil dev keys):
+  - Enroll (limit 3); 2 OK calls; restart; 1 OK call, then `STOP` (count persisted).
+  - `--cheat` call → `REJECTED … violation` → server log `[slash] … commit 0x57da1e… reveal 0xe06cef…`; `totalBurned` 0.015 ETH.
+  - REST twin without a proof → 401 `missing`.
+- **Monad testnet (registry v2):**
+  - Demo agent enrolled at index 2 (limit 5, 0.05 MON; txs in `deployments.md`). Server run with slashing off: the slasher holds 0.016 MON, too little for gas.
+  - Run 1: 3 × `OK` with live Wikipedia results; proofs 552–1429 ms; every root checked with `isKnownRoot` on Monad.
+  - Run 2 (restart): `remaining now 2`, 2 × `OK`, then `STOP` at the 6th query.
+  - Afterwards the demo's local state (usage file and nullifier DB) was reset together, so the next run starts clean.
+- **Exit check (clean-machine variant):**
+  - Fresh `git clone` of the repo into a scratch dir.
+  - Quickstart files taken verbatim from the code blocks in `docs/quickstart-service.md`.
+  - Steps 1–3: install, create the service, `curl` → `HTTP/1.1 401 {"error":"quota","reason":"missing"}` at +15 s.
+  - Step 4: a staked-agent call → `200 {"hello":"anonymous staked agent"}` at +28 s (machine time).
+  - Caveats: warm pnpm store; no human reading or typing; cloned from the local repo because GitHub did not have these commits yet. The clone (holding a copy of the agent key in its `.env`) was deleted afterwards.
+- **Issues found and fixed:**
+  - Message-id counts lived only in memory, so a restarted agent could slash itself. Fixed with a persistent usage store.
+  - `FileUsageStore` failed when its directory was missing; it now creates it.
+  - pnpm auto-added a `minimumReleaseAgeExclude` for hono 4.13.13. I reverted that, restored the lockfile and pinned 4.13.12.
+- Balances after: deployer 0.363 MON, slasher 0.016 MON.

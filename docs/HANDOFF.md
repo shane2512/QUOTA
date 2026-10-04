@@ -1,6 +1,6 @@
 # QUOTA — Handoff for the next engineer / agent
 
-You are continuing a hackathon build (Monad Metropolis, Track 4). Deadline **14 Oct 2026, 09:29 IST**; submit by the evening of 13 Oct. Repo: `github.com/shane2512/QUOTA`. Phases 0–3 are done and independently verified (2026-10-05; see §8b). **Start at Phase 4** (§9). Read §8 first: the slash works on-chain but is not yet economical at demo stake sizes.
+You are continuing a hackathon build (Monad Metropolis, Track 4). Deadline **14 Oct 2026, 09:29 IST**; submit by the evening of 13 Oct. Repo: `github.com/shane2512/QUOTA`. Phases 0–4 are done (Phase 3 independently re-verified 2026-10-05, §8b). **Start at Phase 5** (§9). Read §8 first: the slash works on-chain but is not yet economical at demo stake sizes. §8c covers what Phase 4 added (middleware, demo MCP server, quickstarts).
 
 ## 1. What QUOTA is (one paragraph)
 Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An operator locks a stake (approved by a human passkey, verified on-chain via the P256 precompile at `0x100`); the agent joins a Merkle tree. Each request carries an RLN-v2 zero-knowledge proof of "I am a member and this is request k of my N this epoch". Reusing a request number leaks the agent's secret `a0` (Shamir two-point recovery); anyone with `a0` can slash the stake. No issuer. The primary output is a primitive (contracts, SDKs, middleware), not a consumer app.
@@ -12,7 +12,8 @@ Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An opera
 4. `docs/gates.md` — **what is actually verified vs not.** Read before trusting any sponsor claim.
 5. `docs/progress.md` — chronological log, decisions, open items
 6. `docs/deployments.md` — addresses and tx evidence
-7. `docs/MASTER_PROMPT.md` — the working rules (summarised below). If a doc and the prompt disagree, stop and ask the owner.
+7. `docs/quickstart-service.md`, `docs/quickstart-agent.md` — how the SDK is used
+8. `docs/MASTER_PROMPT.md` — the working rules (summarised below). If a doc and the prompt disagree, stop and ask the owner.
 
 ## 3. Rules you must keep (from the master prompt)
 - **Honesty:** never present something as working that you did not run; paste real output. Never fake a sponsor integration. State measured numbers as measured.
@@ -32,8 +33,9 @@ Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An opera
 | 1 Contracts | Done. v2 verified on Sourcify; enroll gas measured on Monad (`eth_estimateGas` 1,299,685) |
 | 2 RLN proofs | Done, including a proof against an on-chain root (closed in the Phase 3 e2e) |
 | 3 Slash (commit–reveal) | Done. On-chain slash with reward on Monad testnet; searcher test in forge. **Independently re-verified 2026-10-05: forge 84/84, pnpm 17/17, typecheck clean, coverage confirmed.** |
-| 4 SDKs, middleware, demo MCP | **Next** |
-| 5–8 | Not started |
+| 4 SDKs, middleware, demo MCP | Done. Express/Hono/MCP middleware, demo MCP server live against v2, quickstarts; clean-checkout quickstart passed (human-stranger timing still open) |
+| 5 Wallet integrations | **Next** |
+| 6–8 | Not started |
 
 ### Scope decisions already taken
 - **BTX does not exist for us** (organizers confirmed). Slash path is **commit–reveal only**; label it as the fallback, never as BTX.
@@ -53,12 +55,19 @@ contracts/script/Deploy.s.sol      deploy script (env-driven; SLASH_SHARE_BPS de
 contracts/tools/passkey-demo/      local page + server to create a real passkey and sign assertions
 packages/core/                     @quota/core: Poseidon/field helpers, SparseMerkleTree, proof wire format,
                                    pinned RLN-20 artifacts, registry ABI, fetchTree (leaves()), syncTree (v1 events)
-packages/client/                   @quota/client: QuotaClient.signRequest/prove, message-id tracking, allowOveruse
-packages/server/                   @quota/server: QuotaVerifier, MemoryNullifierStore, RegistryRootChecker, onViolation
+packages/client/                   @quota/client: QuotaClient (prove/signRequest, allowOveruse, UsageStore/FileUsageStore),
+                                   deriveSecret, RegistryMembership, quotaFetch, quotaToolMeta
+packages/server/                   @quota/server: QuotaVerifier, MemoryNullifierStore, RegistryRootChecker, onViolation,
+                                   quotaExpress, quotaHono, quotaTool (MCP); @quota/server/sqlite: SqliteNullifierStore
 packages/slasher/                  @quota/slasher: WalletAdapter, LocalKeyWallet, Broadcaster, CommitRevealPath, Slasher
 packages/server/scripts/phase2-exit.ts   Phase 2 exit check (`pnpm phase2`, runs against v1)
-packages/slasher/scripts/phase3-e2e.ts   Phase 3 exit check (`pnpm --filter @quota/slasher phase3`, uses .env)
-packages/slasher/scripts/soft-passkey.ts TEST TOOLING: software P-256 authenticator for unattended scripts
+packages/devtools/                 @quota/devtools, TEST TOOLING ONLY: SoftPasskey, enrollWithSoftPasskey,
+                                   scripts/enroll-agent.ts (`pnpm --filter @quota/devtools enroll-agent`),
+                                   scripts/phase3-e2e.ts (`pnpm phase3`, uses .env)
+apps/demo-mcp/                     reference MCP server (web_search over live Wikipedia) + REST twin + demo agent
+                                   (`pnpm --filter @quota/demo-mcp start` / `agent "query" ... [--cheat]`)
+docs/quickstart-service.md         protect an API in < 10 min (tested on a clean checkout)
+docs/quickstart-agent.md           agent side: 5 lines + demo walkthrough
 apps/web/                          Next.js landing + consoles from another contributor; "demo data", not reviewed
 docs/                              PRD, phases, gates, deployments, progress
 ```
@@ -97,6 +106,10 @@ Deployed on Monad testnet (chain 10143):
   - A freshly funded account's first transaction is rejected ("Signer had insufficient balance") because consensus checks lagging state. Wait ~4 blocks after funding.
 - **Never keep a funded throwaway key only in memory.** The e2e sweeps the operator's balance back in a `finally`.
 - **anvil:** run with `--hardfork osaka --block-time 1`. Osaka is needed for P256. Without block time, anvil only mines on transactions, so the commit→reveal wait never ends.
+- **Persist the agent's message-id count** (`FileUsageStore`). With the in-memory default, a restarted agent reuses id 0 within the epoch and the server treats it as a violation, i.e. the agent slashes itself. If you reset a demo, delete the agent usage file **and** the server's nullifier DB together.
+- The demo-mcp server and agent load `../../.env` but **shell env wins** (`process.loadEnvFile` does not override). That is how the anvil rehearsal used public dev keys without touching `.env`.
+- pnpm 11 enforces a minimum release age. A too-new package version makes it add a `minimumReleaseAgeExclude` entry to `pnpm-workspace.yaml`. Don't keep that: pin an older version instead (hono is pinned to 4.13.12 for this reason).
+- `node:sqlite` needs Node ≥ 22.13 (prints an ExperimentalWarning).
 - `expectRevert` in forge is consumed by the next external call. `PoseidonT2/T3.hash` are external library calls, so build Merkle proofs **before** `vm.expectRevert`.
 - **Dynamic's Node SDK does not run on Windows** (`Neon: unsupported system: win32`). Use Linux, macOS or WSL (an Ubuntu distro with Node 22 worked).
 - Port 3000 may be taken by the web dev server; the passkey tool uses 3777 and the registry allows both origins.
@@ -110,10 +123,10 @@ Deployed on Monad testnet (chain 10143):
 ## 7. Setup on a new machine
 1. Node ≥ 20, pnpm ≥ 9, Foundry (`foundryup`; 1.8.4 used). Git with submodules: `git clone --recurse-submodules` (or `git submodule update --init --recursive`).
 2. `cd contracts && forge test` — expect 84 passed.
-3. `pnpm install && pnpm typecheck && pnpm test` — expect core 9, server 5, slasher 3 passed (~30 s, real proofs). `pnpm phase2` re-runs the Phase 2 check against v1 (~4 min, event scan).
+3. `pnpm install && pnpm typecheck && pnpm test` — expect core 12, client 2, server 9, slasher 3 passed (~40 s, real proofs). `pnpm phase2` re-runs the Phase 2 check against v1 (~4 min, event scan).
 4. Copy `.env.example` to `.env` (gitignored). **Do not ask for or reuse the previous owner's keys.** Generate your own throwaway deployer and slasher keys, fund them at `https://faucet.monad.xyz`, and add sponsor keys only for accounts you own. Required env names are in `docs/02-requirements-env.md` §5 (now includes `SLASHER_PRIVATE_KEY`).
 5. Public testnet RPC: `https://testnet-rpc.monad.xyz`, chain id 10143.
-6. `pnpm --filter @quota/slasher phase3` re-runs the slash e2e. It spends about 0.15 MON operator gas (mostly swept back), 0.03 stake, and ~0.28 MON slasher gas. The slasher needs ≥ 0.3 MON.
+6. `pnpm phase3` (= `pnpm --filter @quota/devtools phase3`) re-runs the slash e2e. It spends about 0.15 MON operator gas (mostly swept back), 0.03 stake, and ~0.28 MON slasher gas. The slasher needs ≥ 0.3 MON.
 
 ## 8. Phase 3 — done (slash, commit–reveal)
 Exit checks, all PASS (full output in `docs/progress.md`; txs in `docs/deployments.md`):
@@ -152,25 +165,48 @@ A separate session re-ran all locally runnable Phase 3 checks from scratch (no c
   - Balances after: deployer 0.586, slasher 0.016. Top up from the faucet before the next redeploy (~0.84) or slash (~0.28).
 - **Commits:** local only, not pushed (push needs owner approval).
 
-## 9. Phase 4 — what to do next (SDKs, middleware, demo MCP server)
-Exit check: a stranger (or a clean machine) follows the service quickstart in ≤ 10 minutes.
-1. `@quota/server` middleware (PRD S2): Express and Hono adapters around `QuotaVerifier.verifyHeader`.
-   - `payloadHash` = keccak256 of a canonical request (method, path, body), computed identically by the client.
-   - Return 429 on `QuotaExhausted`-style failures, 401 on invalid proofs, 409 on replay.
-   - Wire `onViolation` to `Slasher.enqueue`.
-2. An MCP server wrapper: the proof travels in request metadata or a transport header. Check what the MCP SDK allows before designing.
-3. `apps/demo-mcp`: a reference MCP server (e.g. a web-search stub with real data) behind QUOTA, using registry v2 from `.env`.
-4. Client side: a `fetch` wrapper that adds `x-quota-proof`. Keep a tree cache refreshed with `fetchTree` when `isKnownRoot` fails.
-5. Persistent nullifier store (SQLite or Redis) behind the `NullifierStore` interface; the memory store loses state on restart.
-6. Quickstarts for both personas; time a fresh developer.
-7. **Flag:** the named external integrator is due by Phase 4 (owner).
+## 8c. Phase 4 — done (SDKs, middleware, demo MCP server, 2026-10-05)
+**How requests are bound:**
+- HTTP: `x = hashToField(keccak256("QUOTA/http/v1\nMETHOD\npath?query\nbody"))`; JSON bodies are canonicalised (sorted keys).
+- MCP: `"QUOTA/mcp-tool/v1\ntool\ncanonical(args)"`, with the proof in `params._meta["quota/proof"]`.
+- Rejections: 401 for a missing, invalid, unknown-root, wrong-payload or stale proof; 409 for a replay; 429 for a violation. MCP returns a tool error with the same reason.
+
+**Evidence** (details in `progress.md`; agent enrollment txs in `deployments.md`):
+- `pnpm test` 26 passed, using real proofs through real Express 5, Hono and MCP SDK 1.32. `forge test` 84. Typecheck clean.
+- Anvil rehearsal of the whole loop, including `--cheat` → violation → on-chain commit–reveal slash from the server.
+- Monad v2 with the demo agent (index 2, limit 5): 5 accepted calls with live Wikipedia results across two agent runs (the count persisted), then `STOP` at the 6th. Slashing was off because the slasher can't pay gas.
+- Clean-checkout quickstart: 401 → 200 in 28 s of machine time, with files taken verbatim from the doc. **Not yet timed with a human.**
+
+**Remaining for Phase 4's intent:**
+- Have a person outside the team run `docs/quickstart-service.md` and record the time.
+- Find a named external integrator (owner).
+- Packages are TS source used from the monorepo. Publishing to npm is **not done and needs owner approval** (it's outward-facing).
+
+## 9. Phase 5 — what to do next (wallet integrations)
+Exit check: the end-to-end flow runs with Privy on the agent side and Dynamic on the service side. No private keys in `.env` except sponsor auth keys.
+1. **`PrivyAgentWallet`** (W1, W2, W4) implementing `WalletAdapter` plus `signMessage`:
+   - A server wallet owned by the operator's Privy user, with our runtime authorization key as an additional signer (`PRIVY_AUTH_PRIVATE_KEY`, `PRIVY_AUTH_KEY_QUORUM_ID`).
+   - Override policy: allowlist QuotaRegistry only, plus a value cap.
+   - Sign-only (`eth_signTransaction`, then broadcast via `Broadcaster`).
+   - The agent secret is `deriveSecret((m) => privy.personal_sign(m))`. Determinism was verified 3/3 in G2, on a wallet without owner or policy; re-check it with the owner/policy setup.
+2. **Negative test:** the policy rejects a transaction to any other contract, and a value above the cap.
+3. **`DynamicServiceWallet`** (W3) implementing `WalletAdapter` for the slasher, via the `@dynamic-labs-wallet/node-evm` server wallet (G3 PASS; macOS/Linux only).
+   - Delegated access stays unclaimed unless a webhook is actually received.
+   - Rewards land at the service operator's Dynamic wallet (`SLASH_RECEIVER`).
+4. Wire both into `apps/demo-mcp`:
+   - The agent signs with Privy (replaces `AGENT_PRIVATE_KEY`).
+   - The server slashes with Dynamic (replaces `SLASHER_PRIVATE_KEY`).
+   - Contracts and the SDK core must not import either provider; the adapters live in `packages/wallets` (layout §6).
+5. **Before any live slash:** top up the slashing wallet (≥ 0.3 MON) and fix slash economics (§8), or demonstrate on anvil.
 
 ## 10. Open items needing the owner
 - Qwen decision.
 - Nansen credits.
-- **A named external integrator (due now, Phase 4).**
+- **A named external integrator (overdue: Phase 4 is done).**
+- Someone outside the team to time the service quickstart.
+- Approval before publishing packages to npm (if wanted).
 - Final public domain (needed for the Phase 7 redeploy).
-- Faucet top-up for the deployer and slasher.
+- Faucet top-up: deployer 0.363 MON, slasher 0.016 MON (a slash needs ~0.28; a redeploy ~0.84).
 - Read access for the organizers' account.
 - Community group (or skip).
 - Push approval for the local commits.

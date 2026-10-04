@@ -52,12 +52,19 @@ Goal: kill unknowns before writing real code.
 **Exit:** on-chain slash with reward received; copy-and-steal test result documented. **PASSED 2026-10-04** (`pnpm --filter @quota/slasher phase3` on Monad testnet; txs in `docs/deployments.md`).
 
 ## Phase 4 — SDKs, middleware, demo MCP server (6–8 Oct)
-- [ ] `@quota/server` middleware for Express/Hono and an MCP wrapper.
-- [ ] `@quota/slasher` with the wallet adapter interface; `LocalKeyWallet` first.
-- [ ] Reference MCP server (`apps/demo-mcp`) protected by QUOTA.
-- [ ] Quickstarts for both personas; measure a fresh developer's integration time.
+- [x] `@quota/server` middleware: `quotaExpress`, `quotaHono`, MCP `quotaTool` (proof in `params._meta["quota/proof"]`), `SqliteNullifierStore`.
+- [x] `@quota/slasher` with the wallet adapter interface; `LocalKeyWallet` (done in Phase 3).
+- [x] Reference MCP server (`apps/demo-mcp`): `web_search` over live Wikipedia, REST twin, optional slashing; demo agent with `--cheat`.
+- [x] Client: `deriveSecret` (W2), `RegistryMembership`, `quotaFetch`, `quotaToolMeta`, persistent `FileUsageStore`.
+- [x] Quickstarts: `docs/quickstart-service.md`, `docs/quickstart-agent.md`.
+- [ ] Time a **human** stranger on the service quickstart (agent-run clean checkout passed; see below).
+- [ ] Named external integrator (owner).
 
-**Exit:** a stranger (or a clean machine) follows the service quickstart in ≤ 10 minutes.
+
+**Exit:** a stranger (or a clean machine) follows the service quickstart in ≤ 10 minutes. **Clean-machine variant PASSED 2026-10-05:**
+- A fresh clone followed the doc literally, with files extracted from the doc's code blocks, not retyped.
+- It went 401 without a proof → 200 for a staked agent on Monad v2, in 28 s of machine time.
+- Caveats: warm pnpm cache; no human reading or typing time included. A human run is still open.
 
 ## Phase 5 — Wallet integrations (7–9 Oct)
 - [ ] **Privy:** operator login, server wallet with owner = operator user, runtime key as additional signer with override policies, secret derivation from signature, sign-only.

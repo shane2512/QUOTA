@@ -25,7 +25,7 @@ Replay protection observed live: the first enroll assertion (signed with nonce 0
 
 ## Phase 3 exit check: on-chain slash (registry v2, 2026-10-04)
 
-Run with `pnpm --filter @quota/slasher phase3`. The operator passkey here is a **software P-256 authenticator** (`packages/slasher/scripts/soft-passkey.ts`, test tooling), not hardware. The hardware passkey path was proven in Phase 1. The operator and receiver are fresh throwaway addresses.
+Run with `pnpm --filter @quota/devtools phase3` (moved from `@quota/slasher` in Phase 4). The operator passkey here is a **software P-256 authenticator** (`packages/slasher/scripts/soft-passkey.ts`, test tooling), not hardware. The hardware passkey path was proven in Phase 1. The operator and receiver are fresh throwaway addresses.
 
 | Step | Tx | Result |
 |---|---|---|
@@ -38,6 +38,17 @@ Run with `pnpm --filter @quota/slasher phase3`. The operator passkey here is a *
 | Sweep operator leftovers to deployer | `0x0eb94917906eba173f9b6250c3a3398d6b882bc1027307940354ad750137b010` | 0.277 MON returned |
 
 **Leaf 0 of v2 is orphaned.** The first e2e attempt enrolled an agent (stake 0.03 MON), then failed on a read (Monad execution lag, since fixed). That operator's key existed only in memory and its secret is lost. Its leftover gas money, roughly 0.43 MON (not measured exactly), is stranded too. The leaf is harmless: nobody can prove with it.
+
+## Phase 4: demo agent (registry v2, 2026-10-05)
+
+Enrolled with `pnpm --filter @quota/devtools enroll-agent` (scripted operator with a software passkey). Agent RLN secret derived from `AGENT_PRIVATE_KEY` (`deriveSecret`); idCommitment `15655976155532526635563038073452362661942229565551089952311669819373754302596`, **index 2, limit 5, stake 0.05 MON**. The operator key was discarded, so this stake cannot be unstaked.
+
+| Step | Tx |
+|---|---|
+| Fund operator `0x5a23e0406eFad8aa879b2969e2d93e6b0352F367` | `0x7610ba58277507909517eb570b4c381e21bac45d8c2ba29d3c85a6f308dc9f77` |
+| `registerPasskey` (estimate 131,851) | `0x2a0aaeb8a4dc0fc7e6a55b7f13124966f8165f7cac64f8c6b5669a98e4a4876f` |
+| `enroll` (estimate 1,282,562) | `0x10b267dcfbacf2c1efd8dc02fd4d73030da7d49146da69e90383f7960acec004` |
+| Sweep 0.279 MON back to the deployer | `0x894f472125b179f5ff318f7c5855056c06f8130298dc6e6701213173e20576b6` |
 
 ## Gas
 

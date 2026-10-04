@@ -8,7 +8,7 @@ Status key: ✅ confirmed in docs this session · ⚠️ from memory, confirm in
 
 | Tool | Version | Why | Get it |
 |---|---|---|---|
-| Node.js | ≥ 20 LTS | SDKs, middleware, apps | nodejs.org |
+| Node.js | ≥ 22.13 | SDKs, middleware, apps (`node:sqlite` for the persistent nullifier store) | nodejs.org |
 | pnpm | ≥ 9 | monorepo | `npm i -g pnpm` |
 | Foundry (forge, cast, anvil) | latest | contracts, tests, deploy | `foundryup` (run in WSL/Git Bash; or use the Windows binary from getfoundry.sh) |
 | Circom 2 + snarkjs | latest | RLN-v2 circuit params/witness | `npm i -g snarkjs`; circom binary from the Circom releases (or reuse prebuilt RLN artifacts, preferred) |
@@ -104,6 +104,8 @@ MONAD_CHAIN_ID=
 DEPLOYER_PRIVATE_KEY=          # throwaway, testnet-funded only
 QUOTA_REGISTRY_ADDRESS=        # filled after deploy
 SLASHER_PRIVATE_KEY=           # throwaway testnet signer for the slasher (LocalKeyWallet, Phase 3)
+AGENT_PRIVATE_KEY=             # demo agent wallet; its RLN secret is derived from a signature (Phase 4)
+AGENT_LIMIT=5                  # per-epoch limit used by devtools enroll-agent
 
 # --- Privy (agent side) ---
 PRIVY_APP_ID=
