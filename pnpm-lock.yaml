@@ -111,6 +111,31 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  packages/slasher:
+    dependencies:
+      '@quota/core':
+        specifier: workspace:*
+        version: link:../core
+      viem:
+        specifier: ^2.57.2
+        version: 2.57.2(typescript@7.0.2)
+    devDependencies:
+      '@quota/client':
+        specifier: workspace:*
+        version: link:../client
+      '@quota/server':
+        specifier: workspace:*
+        version: link:../server
+      '@types/node':
+        specifier: ^26.6.4
+        version: 26.6.4
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
 packages:
 
   '@adraffy/ens-normalize@1.11.1':
