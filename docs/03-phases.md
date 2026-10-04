@@ -27,8 +27,8 @@ Goal: kill unknowns before writing real code.
 - [x] `PasskeyAuth`: WebAuthn assertion verification via `0x100` (all checks in PRD C2).
 - [x] Test vectors: valid, wrong challenge, wrong origin, wrong rpId, missing UP/UV, high-s, replayed nonce, malformed JSON.
 - [x] `QuotaRegistry`: tree (Poseidon), `registerPasskey`, `enroll`, `topUp`, `requestUnstake`/`unstake`, recent-roots window.
-- [ ] Measure enroll gas on Monad (forge model 1.68M at depth 20; Monad figure not yet measured, see `docs/deployments.md`).
-- [x] Deployed to testnet. [ ] Explorer source verification still open.
+- [x] Measure enroll gas on Monad: `eth_estimateGas` 1,299,685 on registry v2, depth 20 (`docs/deployments.md`).
+- [x] Deployed to testnet. [x] Explorer source verification: v2 verified on Sourcify (v1 not verified, superseded).
 
 **Exit:** `forge test` green incl. all negative cases; a real browser passkey assertion verifies on-chain on testnet.
 
@@ -38,17 +38,18 @@ Goal: kill unknowns before writing real code.
 - [x] `@quota/server` verifier + nullifier store + secret recovery from two shares.
 - [x] Recent-roots sync from the registry (tree rebuilt from `LeafSet` events; roots checked with `isKnownRoot`).
 - [x] Benchmark proof gen/verify and record real numbers (`docs/progress.md`).
-- [ ] Open: a proof against an **on-chain** root needs a member whose `a0` we know, i.e. a passkey-approved `enroll`. Do it at the start of Phase 3.
+- [x] Proof against an **on-chain** root: done in the Phase 3 e2e on registry v2 (3 proofs verified with `isKnownRoot` over RPC).
 
 **Exit:** script: 3 honest requests verify; a 2nd use of the same `k` recovers `a0` exactly; per-server external nullifier prevents cross-server collisions.
 
 ## Phase 3 — Slash and BTX path (5–7 Oct)
-- [ ] `slash(a0, limit, receiver)` with leaf recompute and payout.
-- [ ] `SubmitPath`: `commitReveal` only (organizers confirmed BTX unavailable).
-- [ ] **Searcher test:** a bot watches the public path and tries to copy the slash. It must fail on the commit–reveal path and succeed on a naive path (to prove the race is real).
-- [ ] Slasher service: violation → queue → slash.
+- [x] Slash with leaf recompute and payout: `commitSlash(keccak256(a0, receiver, salt))` → `revealSlash(a0, receiver, salt, siblings, path)` in a later block. Pays `SLASH_SHARE_BPS` (5000), burns the rest, works while Unstaking, marks `Slashed`.
+- [x] `SubmitPath`: `CommitRevealPath` only (organizers confirmed BTX unavailable).
+- [x] **Searcher test** (forge, `test/Slash.t.sol`): the naive one-step slash is stolen by a front-runner; on commit–reveal the copied reveal (`NoCommitment`), a same-block commit+reveal (`RevealTooEarly`) and a later reveal (`NotSlashable`) all fail.
+- [x] Slasher service (`@quota/slasher`): violation → dedupe → queue → commit → reveal (→ `removeSlashedLeaf` if the tree moved).
+- [x] Also shipped in the same redeploy: `limit ≤ 65535` (circuit range), on-chain `leaves()` for fast tree sync.
 
-**Exit:** on-chain slash with reward received; copy-and-steal test result documented.
+**Exit:** on-chain slash with reward received; copy-and-steal test result documented. **PASSED 2026-10-04** (`pnpm --filter @quota/slasher phase3` on Monad testnet; txs in `docs/deployments.md`).
 
 ## Phase 4 — SDKs, middleware, demo MCP server (6–8 Oct)
 - [ ] `@quota/server` middleware for Express/Hono and an MCP wrapper.

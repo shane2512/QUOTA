@@ -1,6 +1,6 @@
 # QUOTA — Handoff for the next engineer / agent
 
-You are continuing a hackathon build (Monad Metropolis, Track 4). Deadline **14 Oct 2026, 09:29 IST**; submit by the evening of 13 Oct. Repo: `github.com/shane2512/QUOTA`. Phases 0, 1 and 2 are done. **Start at Phase 3** (first item: the on-chain proof check in §8).
+You are continuing a hackathon build (Monad Metropolis, Track 4). Deadline **14 Oct 2026, 09:29 IST**; submit by the evening of 13 Oct. Repo: `github.com/shane2512/QUOTA`. Phases 0–3 are done. **Start at Phase 4** (§9). Read §8 first: the slash works on-chain but is not yet economical at demo stake sizes.
 
 ## 1. What QUOTA is (one paragraph)
 Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An operator locks a stake (approved by a human passkey, verified on-chain via the P256 precompile at `0x100`); the agent joins a Merkle tree. Each request carries an RLN-v2 zero-knowledge proof of "I am a member and this is request k of my N this epoch". Reusing a request number leaks the agent's secret `a0` (Shamir two-point recovery); anyone with `a0` can slash the stake. No issuer. The primary output is a primitive (contracts, SDKs, middleware), not a consumer app.
@@ -29,10 +29,11 @@ Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An opera
 | Phase | State |
 |---|---|
 | 0 Gates | Done (Qwen deferred by owner) |
-| 1 Contracts | Done. Open: explorer verification, real Monad gas figure |
-| 2 RLN proofs | Done. Open: a proof against an on-chain root (needs a passkey enroll of a known-`a0` agent) |
-| 3 Slash (commit–reveal) | **Next** |
-| 4–8 | Not started |
+| 1 Contracts | Done. v2 verified on Sourcify; enroll gas measured on Monad (`eth_estimateGas` 1,299,685) |
+| 2 RLN proofs | Done, including a proof against an on-chain root (closed in the Phase 3 e2e) |
+| 3 Slash (commit–reveal) | Done. On-chain slash with reward on Monad testnet; searcher test in forge |
+| 4 SDKs, middleware, demo MCP | **Next** |
+| 5–8 | Not started |
 
 ### Scope decisions already taken
 - **BTX does not exist for us** (organizers confirmed). Slash path is **commit–reveal only**; label it as the fallback, never as BTX.
@@ -45,90 +46,126 @@ Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An opera
 ### What exists
 ```
 contracts/src/PasskeyAuth.sol      WebAuthn verifier (strict parser, P256VERIFY)
-contracts/src/QuotaRegistry.sol    tree, passkey registry, enroll/topUp/changeLimit/requestUnstake/unstake
-contracts/test/*.t.sol             64 tests, all green
-contracts/script/Deploy.s.sol      deploy script (env-driven)
+contracts/src/QuotaRegistry.sol    tree, passkey registry, enroll/topUp/changeLimit/requestUnstake/unstake,
+                                   commitSlash/revealSlash/removeSlashedLeaf, leaves(), MAX_LIMIT
+contracts/test/*.t.sol             84 tests, all green (Slash.t.sol has the searcher test)
+contracts/script/Deploy.s.sol      deploy script (env-driven; SLASH_SHARE_BPS default 5000)
 contracts/tools/passkey-demo/      local page + server to create a real passkey and sign assertions
 packages/core/                     @quota/core: Poseidon/field helpers, SparseMerkleTree, proof wire format,
-                                   pinned RLN-20 artifacts (artifacts/rln-20 + SHA256SUMS), syncTree (LeafSet replay)
+                                   pinned RLN-20 artifacts, registry ABI, fetchTree (leaves()), syncTree (v1 events)
 packages/client/                   @quota/client: QuotaClient.signRequest/prove, message-id tracking, allowOveruse
 packages/server/                   @quota/server: QuotaVerifier, MemoryNullifierStore, RegistryRootChecker, onViolation
-packages/server/scripts/phase2-exit.ts   Phase 2 exit check (`pnpm phase2`)
+packages/slasher/                  @quota/slasher: WalletAdapter, LocalKeyWallet, Broadcaster, CommitRevealPath, Slasher
+packages/server/scripts/phase2-exit.ts   Phase 2 exit check (`pnpm phase2`, runs against v1)
+packages/slasher/scripts/phase3-e2e.ts   Phase 3 exit check (`pnpm --filter @quota/slasher phase3`, uses .env)
+packages/slasher/scripts/soft-passkey.ts TEST TOOLING: software P-256 authenticator for unattended scripts
 apps/web/                          Next.js landing + consoles from another contributor; "demo data", not reviewed
 docs/                              PRD, phases, gates, deployments, progress
 ```
-Deployed on Monad testnet (chain 10143): registry `0x05a5fe209E19C6707e2E701A76A0C94b2351E0ac` (rpId `localhost`). A real Windows Hello passkey was registered and one agent enrolled (txs in `docs/deployments.md`).
+Deployed on Monad testnet (chain 10143):
+- **Registry v2 (current):** `0xd89BFd2f093015193d42EA51170D64d9242a40C6`, rpId `localhost`, verified on Sourcify. Leaf 0 is an orphan from a failed run (secret unknown, harmless). Leaf 1 was enrolled and then slashed by the Phase 3 e2e.
+- Registry v1 (superseded): `0x05a5…0ac`, holds the Phase 1 hardware-passkey evidence.
+- Details and tx hashes: `docs/deployments.md`.
 
 ## 5. Contract facts you need
 - **Leaf** = `Poseidon([idCommitment, limit])`, `idCommitment = Poseidon(a0)`. The contract computes the leaf itself (the PRD's C4 said the caller passes `rateCommitment`; we changed it so a caller cannot claim a bigger limit than the stake pays for).
-- Tree: zk-kit `InternalBinaryIMT`, fixed depth (constructor arg; deploy default 20), **zero leaf = 0**, `PoseidonT3` from `poseidon-solidity`. Removal/update need Merkle siblings + path against the **current** root, so a slasher can race enrollments. Events `LeafSet(index, leaf)` (leaf 0 = removed) let you rebuild the tree off-chain in order.
+- Tree: zk-kit `InternalBinaryIMT`, fixed depth (constructor arg; deploy default 20), **zero leaf = 0**, `PoseidonT3` from `poseidon-solidity`. Removal/update need Merkle siblings + path against the **current** root. `leaves(from, count)` returns current leaves (0 = removed) and `members(id).index` gives an agent's index, so `fetchTree` rebuilds the tree with a few `eth_call`s. `LeafSet(index, leaf)` events remain.
 - **Passkey challenge** = `keccak256(abi.encode(chainId, registry, operator, uint8 action, keccak256(params), nonce))`. Actions: `0 RegisterPasskey, 1 Enroll, 2 RequestUnstake, 3 ChangeLimit`. Params are `abi.encode` of: register `(x,y)`; enroll `(id, limit, treeId, msg.value)`; unstake `(id, destination)`; changeLimit `(id, newLimit)`. Operator = `msg.sender`. The nonce increments on every successful action.
-- Member records (`members(id)`) are keyed by `idCommitment` and kept after unstake. Phase 3's `slash(a0, limit, receiver)` should use them (payout from `stake`, remove leaf with caller-supplied siblings, mark a new `Slashed` state so the id can never re-enroll). Unstake delay must exceed epoch + root TTL so a cheater cannot dodge a slash.
-- Roots stay valid for `ROOT_TTL` after being superseded (`isKnownRoot`).
+- **Slash (commit–reveal, not BTX):**
+  - `commitSlash(keccak256(abi.encode(a0, receiver, salt)))`, then in a **later block** `revealSlash(a0, receiver, salt, siblings, path)`.
+  - The reveal pays `SLASH_SHARE_BPS` (5000) of the stake to `receiver`. The rest is burned (locked; `totalBurned`). A 100% share is rejected because it would make self-slashing free.
+  - Works while `Active` or `Unstaking`; the member becomes `Slashed` and can never re-enroll or unstake.
+  - If the siblings are stale (the tree moved after they were built), the reveal still pays and sets `pendingRemoval[id]`. Anyone can then call `removeSlashedLeaf(id, siblings, path)`. The slasher does this automatically.
+  - Searcher model: a leader/RPC operator copying the reveal gets `NoCommitment` (receiver is inside the commitment). A same-block commit+reveal gets `RevealTooEarly`. Once ours lands, anything later gets `NotSlashable`.
+- Members (`members(id)`): `(operator, state, limit, unlockAt, stake, index, destination)`, state `0 None, 1 Active, 2 Unstaking, 3 Withdrawn, 4 Slashed`.
+- Roots stay valid for `ROOT_TTL` after being superseded (`isKnownRoot`). Unstake delay (2 h) > epoch (1 h) + root TTL (10 min), so a cheater cannot unstake away from a slash.
 - `rpId` and allowed origins are **immutable**. The registry must be redeployed when the final public domain is chosen (Phase 7). A passkey made for `localhost` does not work on another domain.
-- `treeId` must be 0 until Phase 6.
-- **`limit` must be ≤ 65535.** The circuit's `RangeCheck(16)` cannot handle more, but `enroll`/`changeLimit` accept `uint64`. Add the cap in the Phase 3 redeploy (the SDK already refuses larger limits).
+- `treeId` must be 0 until Phase 6. `limit` must be 1..65535 (`MAX_LIMIT`, circuit range).
 
 ## 5b. RLN facts (Phase 2)
 - Artifacts: PSE p0tion ceremony `rln-20` (rlnjs 3.x defaults), circuit `circom-rln` `RLN(20, 16)`. Public signals in order: `[y, root, nullifier, x, externalNullifier]`. `y = a0 + a1·x`, `a1 = Poseidon(a0, externalNullifier, messageId)`, `nullifier = Poseidon(a1)`.
 - `x = hashToField(payloadHash)`; `hashToField` = keccak256 >> 8. External nullifier = `Poseidon(hashToField(serverId), epoch)`, epoch = `floor(unix / epochLength)` (default 3600 s). The verifier accepts the current epoch and one previous one (`epochGrace`).
 - Wire format: header `x-quota-proof` = base64url JSON `{proof, signals, epoch}` (`encodeProof`/`decodeProof` in core).
 - Verifier order: epoch → external nullifier → payload binding → `isKnownRoot` (RPC, 5 s cache) → Groth16 → nullifier store. Same nullifier + same x = `replay`; same nullifier + different x = `violation` → `onViolation({secret, idCommitment, …})`. Never log `secret`.
-- Measured on an Apple M2 (node 26): proving median 1170 ms (min 902, max 1918, n=10); verify median 32 ms. Windows and browser not measured.
-
+- Measured on an Apple M2 (node 26): proving median 1170 ms in one run and 705 ms in another (n=10 each); verify median 16–32 ms. Windows and browser not measured.
 
 ## 6. Gotchas that already cost time
 - **Foundry only exposes the P256 precompile under `evm_version = "osaka"`** (set in `contracts/foundry.toml`). Under `prague` the call returns empty and valid signatures fail. `PasskeyAuth` fails closed when the precompile is missing.
-- **Monad bills the gas limit**, not gas used. Receipts show your limit as `gasUsed`. To measure real consumption use `eth_estimateGas` before sending. Monad also rejected a 10 gwei max fee; gas price is ~102 gwei, use ≥ 200 gwei max fee in scripts.
+- **Monad bills the gas limit**, not gas used. Receipts show your limit as `gasUsed`. Use `eth_estimateGas` (the `Broadcaster` sends estimate × 1.15). Monad rejected a 10 gwei max fee; gas price is ~102 gwei, so scripts use a max-fee floor of 200 gwei. The sender's balance must cover limit × max fee + value, even though only limit × effective price is charged.
+- **Monad executes asynchronously; this cost two failed runs and ~0.43 MON:**
+  - An `eth_call` pinned to the newest block number can return state from before that block's transactions. `fetchTree` reads at latest and retries until the root matches `root()`.
+  - A freshly funded account's first transaction is rejected ("Signer had insufficient balance") because consensus checks lagging state. Wait ~4 blocks after funding.
+- **Never keep a funded throwaway key only in memory.** The e2e sweeps the operator's balance back in a `finally`.
+- **anvil:** run with `--hardfork osaka --block-time 1`. Osaka is needed for P256. Without block time, anvil only mines on transactions, so the commit→reveal wait never ends.
+- `expectRevert` in forge is consumed by the next external call. `PoseidonT2/T3.hash` are external library calls, so build Merkle proofs **before** `vm.expectRevert`.
 - **Dynamic's Node SDK does not run on Windows** (`Neon: unsupported system: win32`). Use Linux, macOS or WSL (an Ubuntu distro with Node 22 worked).
 - Port 3000 may be taken by the web dev server; the passkey tool uses 3777 and the registry allows both origins.
 - Shell heredocs containing Solidity quotes broke Git Bash twice, and a failed multi-command line silently skipped later commands. Write files with an editor tool, and check results.
 - `cast send` cannot take a tuple containing a JSON string; submit passkey assertions with viem.
-- **Monad testnet `eth_getLogs` is capped at 100 blocks** (`-32614`). `syncTree` chunks and runs 8 requests in parallel: 28,384 blocks took 25.8 s and this grows by ~216k blocks/day. Before the demo, either store leaves on-chain (`leaves(i)` view) in the Phase 3 redeploy or run an indexer (proposal, not built).
+- Monad testnet `eth_getLogs` is capped at 100 blocks. Event sync of v1 took 234 s for 272,700 blocks; use v2's `leaves()` (`fetchTree`) instead.
 - snarkjs keeps bn128 worker threads alive; scripts/tests call `globalThis.curve_bn128.terminate()` at the end or Node never exits.
 - pnpm 11 blocks install scripts; `pnpm-workspace.yaml` has `allowBuilds: esbuild: true` (needed by tsx).
-- Phase 2 was built on macOS. That machine had no Foundry and the contract submodules were not checked out (`git submodule update --init --recursive` before `forge test`).
 - Privy test: `personal_sign` was deterministic (3/3 same wallet and message). The wallet used had no owner or policy; the owner + policy + additional-signer path is Phase 5 and untested.
 
 ## 7. Setup on a new machine
-1. Node ≥ 20, pnpm ≥ 9, Foundry (`forge`, `cast`). Git with submodules: `git clone --recurse-submodules` (or `git submodule update --init --recursive`).
-2. `cd contracts && forge test` — expect 64 passed.
-3. `pnpm install && pnpm typecheck && pnpm test` — expect core 9 passed, server 5 passed (~30 s, real proofs). `pnpm phase2` re-runs the exit check against the live registry (needs network; ~1 min).
-4. Copy `.env.example` to `.env` (gitignored). **Do not ask for or reuse the previous owner's keys.** Generate your own throwaway deployer with `cast wallet new`, fund it at `https://faucet.monad.xyz`, and put sponsor keys in only if you own those accounts. Required env names are listed in `docs/02-requirements-env.md` §5.
+1. Node ≥ 20, pnpm ≥ 9, Foundry (`foundryup`; 1.8.4 used). Git with submodules: `git clone --recurse-submodules` (or `git submodule update --init --recursive`).
+2. `cd contracts && forge test` — expect 84 passed.
+3. `pnpm install && pnpm typecheck && pnpm test` — expect core 9, server 5, slasher 3 passed (~30 s, real proofs). `pnpm phase2` re-runs the Phase 2 check against v1 (~4 min, event scan).
+4. Copy `.env.example` to `.env` (gitignored). **Do not ask for or reuse the previous owner's keys.** Generate your own throwaway deployer and slasher keys, fund them at `https://faucet.monad.xyz`, and add sponsor keys only for accounts you own. Required env names are in `docs/02-requirements-env.md` §5 (now includes `SLASHER_PRIVATE_KEY`).
 5. Public testnet RPC: `https://testnet-rpc.monad.xyz`, chain id 10143.
+6. `pnpm --filter @quota/slasher phase3` re-runs the slash e2e. It spends about 0.15 MON operator gas (mostly swept back), 0.03 stake, and ~0.28 MON slasher gas. The slasher needs ≥ 0.3 MON.
 
-## 8. Phase 2 — done (RLN proofs)
-Exit check `pnpm phase2`, all PASS (full output in `docs/progress.md`, 2026-10-04):
-- Tree rebuilt from live `LeafSet` events: leaf count and **root equal the on-chain registry**, `isKnownRoot` true, depth 20 = circuit depth. This proves contract and circuit hash the tree the same way.
-- 3 honest requests verify; a 4th reuses message id 0 and the server recovers `a0` exactly; `Poseidon(recovered)` = the member's idCommitment.
-- The same message id on two servers gives different nullifiers, with no false violation; server B rejects a proof made for server A.
-- Negative cases (tests): replay, wrong payload, unknown root, tampered `y`, stale epoch, malformed header, wrong leaf, limit > 65535.
+## 8. Phase 3 — done (slash, commit–reveal)
+Exit checks, all PASS (full output in `docs/progress.md`; txs in `docs/deployments.md`):
+- **On-chain slash on Monad testnet (registry v2):** enroll → 3 RLN proofs verified against the **on-chain** root → 4th reuses a message id → server recovers `a0` → slasher commit (block 68177684) → reveal (block 68177704) → receiver +0.015 MON (50% of 0.03) → member `Slashed`, leaf removed in the reveal → a second violation is not slashed twice.
+- **Searcher (copy-and-steal), forge `test/Slash.t.sol`:** the naive one-step slash is stolen by a front-runner. On commit–reveal, the copied reveal, a same-block commit+reveal, and a later reveal all fail, and an exact copy still pays our receiver.
+- `forge test` 84 passed; coverage `QuotaRegistry` 98.25% lines / 80.56% branches, `PasskeyAuth` 100% lines. `pnpm test` 17 passed; typecheck clean.
 
-**Not yet shown:** a proof against an **on-chain** root. The only on-chain leaf has a random `idCommitment` (no known `a0`), so the protocol checks used a member appended to a copy of the live tree. Closing this needs one passkey-approved `enroll` of an agent whose `a0` we hold. Use `QuotaClient.idCommitment` as the `idCommitment` in the passkey tool. That needs the operator's passkey and the deployer key from `.env`.
+**Must fix before the demo (economics):**
+- The slasher pays ~0.284 MON gas per slash (commit 59,687 + reveal 2,725,641 limit at ~102 gwei).
+- At unit 0.01 MON and a 50% share, the slash only pays off when the stake is above ~0.57 MON.
+- Options:
+  - Raise the demo's minimum stake / `UNIT`.
+  - Cut reveal gas. It hashes the Merkle path 3×: our `_verify`, then zk-kit `_update` verifies again and rewrites. Use one verify-and-rewrite pass.
+- Decide at the Phase 7 redeploy (needed anyway for the public domain).
 
-### Phase 2 session report (2026-10-04)
-- **Commits:** `e8d317d` (packages + artifacts), `c2ba33d` (docs). Local only, **not pushed**. Push needs owner approval.
-- **Evidence:** `pnpm test` → core 9/9, server 5/5 (real Groth16 proofs, no circuit mocks); `pnpm typecheck` clean; `pnpm phase2` all PASS. Proving median 1170 ms on an Apple M2 (2 s budget, PRD Z2); verify median 32 ms.
-- **Deviations from the PRD/layout:**
-  - Added `@quota/core` (not in the §6 layout). Client, server and the future slasher share its hashing and tree, so client and server don't import each other.
-  - Our own sparse Merkle tree instead of `@zk-kit/imt`, whose current release is a 2.0 beta. Correctness is pinned by the live root match.
-  - `snarkjs` is GPL-3.0. SDK consumers inherit that licence, so mention it in the docs.
-- **Not run this session:** `forge test`. The Mac had no Foundry and the contract submodules were not checked out. No contract files changed.
-- **Risks for the deadline:**
-  - Event-based tree sync slows down every day (100-block `getLogs` cap).
-  - The `limit` cap and slash both need a registry redeploy. Do them together, along with any leaf-storage change.
-  - The on-chain proof check depends on the owner being at the passkey machine.
+### Phase 3 session report (2026-10-04)
+- **Deviations:**
+  - `commitSlash` hashes `(a0, receiver, salt)`; the PRD's `limit` argument is dropped because the registry knows it.
+  - `SubmitPath` exposes `slash(req)` instead of `send(tx)`.
+  - Burn share added.
+  - On-chain `leaves()` added.
+  - The e2e uses a **software P-256 authenticator** (labelled test tooling). The hardware passkey path was proven in Phase 1 on v1 and has not been re-run on v2.
+  - New env var `SLASHER_PRIVATE_KEY`.
+- **Money:**
+  - The v2 deploy cost ~0.84 MON.
+  - A failed run stranded ~0.43 MON.
+  - Balances after: deployer 0.586, slasher 0.016. Top up from the faucet before the next redeploy (~0.84) or slash (~0.28).
+- **Commits:** local only, not pushed (push needs owner approval).
 
-## 9. Phase 3 — what to do next (slash, commit–reveal)
-Exit check: on-chain slash with reward received; copy-and-steal test result documented.
-1. Redeploy prep (one redeploy, not several): add `slash`, add `limit ≤ 65535` in `enroll`/`changeLimit`, and decide on leaf storage for sync (above).
-2. `commitSlash(H(a0, limit, receiver, salt))`, then `revealSlash(...)` after at least one block. Reveal recomputes the leaf from `a0`, removes it with caller-supplied siblings against the **current** root (build them with `syncTree` + `SparseMerkleTree.proof`), pays `SLASH_SHARE` of the stake to the committed receiver, and marks the member `Slashed` so the id can never re-enroll. The unstake delay must exceed epoch + root TTL so a cheater cannot dodge a slash.
-3. **Searcher test:** a bot watching the public path must fail to steal the reward on commit–reveal and succeed on a naive one-step `slash` (to prove the race is real). After commit the reward is locked to the committer; the reveal still exposes `a0` publicly.
-4. Slasher service (`packages/slasher`): `QuotaVerifier.onViolation` → queue → read `members(Poseidon(a0)).limit` → commit → wait a block → reveal. Dedupe: many violations by one secret = one slash. Use `LocalKeyWallet` first (Phase 4 adds adapters).
-5. Then close the Phase 2 open item with a real enroll and a proof against that on-chain root.
+## 9. Phase 4 — what to do next (SDKs, middleware, demo MCP server)
+Exit check: a stranger (or a clean machine) follows the service quickstart in ≤ 10 minutes.
+1. `@quota/server` middleware (PRD S2): Express and Hono adapters around `QuotaVerifier.verifyHeader`.
+   - `payloadHash` = keccak256 of a canonical request (method, path, body), computed identically by the client.
+   - Return 429 on `QuotaExhausted`-style failures, 401 on invalid proofs, 409 on replay.
+   - Wire `onViolation` to `Slasher.enqueue`.
+2. An MCP server wrapper: the proof travels in request metadata or a transport header. Check what the MCP SDK allows before designing.
+3. `apps/demo-mcp`: a reference MCP server (e.g. a web-search stub with real data) behind QUOTA, using registry v2 from `.env`.
+4. Client side: a `fetch` wrapper that adds `x-quota-proof`. Keep a tree cache refreshed with `fetchTree` when `isKnownRoot` fails.
+5. Persistent nullifier store (SQLite or Redis) behind the `NullifierStore` interface; the memory store loses state on restart.
+6. Quickstarts for both personas; time a fresh developer.
+7. **Flag:** the named external integrator is due by Phase 4 (owner).
 
 ## 10. Open items needing the owner
-Qwen decision; Nansen credits; one passkey tap + the deployer key on the machine with the registered passkey, to enroll a known-`a0` agent (closes the Phase 2 on-chain proof check); a named external integrator (needed by Phase 4); final public domain; read access for the organizers' account; community group (or skip). The Vercel deployment `https://quota-metro.vercel.app` (formerly `quota-web-zeta`) shows mock data; do not present it as live results.
+- Qwen decision.
+- Nansen credits.
+- **A named external integrator (due now, Phase 4).**
+- Final public domain (needed for the Phase 7 redeploy).
+- Faucet top-up for the deployer and slasher.
+- Read access for the organizers' account.
+- Community group (or skip).
+- Push approval for the local commits.
+- The Vercel deployment `https://quota-metro.vercel.app` shows mock data; do not present it as live results.
 
 ## 11. Working-tree note
-`apps/web` belongs to another contributor (their edits are now committed in `0ddd942`). Ask before touching it.
+`apps/web` belongs to another contributor (their edits are committed in `0ddd942`). Ask before touching it.

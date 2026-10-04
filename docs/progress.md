@@ -7,9 +7,9 @@ Append-only record of what was done, what was observed, and what is still open. 
 | Phase | Status | Exit check |
 |---|---|---|
 | 0 Gates and setup | Done except Qwen (deferred by owner) | `docs/gates.md` written |
-| 1 Contracts: custody and registry | Done, two items open (explorer verification, Monad gas measurement) | 64 tests green; real passkey verified on testnet |
-| 2 RLN proofs | Done (local member; on-chain member proof waits for a passkey enroll) | `pnpm phase2` all PASS; 14 package tests green |
-| 3 Slash (commit–reveal) | Not started | |
+| 1 Contracts: custody and registry | Done (v2 verified on Sourcify; enroll gas measured on Monad) | real passkey verified on testnet (v1) |
+| 2 RLN proofs | Done (on-chain root proof closed in Phase 3 e2e) | `pnpm phase2` all PASS |
+| 3 Slash (commit–reveal) | Done | `pnpm --filter @quota/slasher phase3` all PASS on Monad testnet; forge 84 passed |
 | 4 SDKs, middleware, demo MCP | Not started | |
 | 5 Wallet integrations | Not started | |
 | 6 Trust tiers (Nansen only) | Not started | |
@@ -63,6 +63,15 @@ Append-only record of what was done, what was observed, and what is still open. 
 | Own 80-line sparse Merkle tree instead of `@zk-kit/imt` | Only a 2.0 beta is current; correctness pinned by matching the live on-chain root |
 | `hashToField` = keccak256 >> 8; external nullifier = `Poseidon(hashToField(serverId), epoch)`; `x = hashToField(payloadHash)` | Semaphore convention; always inside the field |
 | `snarkjs` (GPL-3.0) for prove/verify | Same library rlnjs uses with these artifacts; licence noted for SDK consumers |
+| Slash is `commitSlash(keccak256(abi.encode(a0, receiver, salt)))` then `revealSlash(a0, receiver, salt, siblings, path)`; the PRD's `limit` argument is dropped | The registry already knows the member's limit; binding the receiver in the commitment is what blocks copy-and-steal |
+| `SLASH_SHARE_BPS` = 5000, the rest is burned (stays locked, counted in `totalBurned`); constructor rejects ≥ 10000 | At 100% a cheater could slash itself and get the whole stake back |
+| Slash allowed while `Unstaking` | A cheater cannot dodge by requesting unstake; the unstake delay (2 h) exceeds epoch (1 h) + root TTL (10 min) |
+| Reveal pays even if siblings are stale; the leaf is then `pendingRemoval` and anyone can call `removeSlashedLeaf` | An enroll between commit and reveal must not block the payout or reopen the race |
+| On-chain `leaves(from, count)` + `Member.index` (registry v2) | Event sync of v1 took 234 s for 272,700 blocks and grows ~216k blocks/day; `fetchTree` now uses a few `eth_call`s |
+| `limit ≤ 65535` (`MAX_LIMIT`) in `enroll`/`changeLimit` | Circuit `RangeCheck(16)` |
+| `SubmitPath` exposes `slash(req)` rather than a generic `send(tx)` (PRD B1) | Commit–reveal is a two-transaction protocol; the interface hides that |
+| e2e uses a software P-256 authenticator (`scripts/soft-passkey.ts`) | Lets the slash e2e run unattended; labelled test tooling, never a passkey claim. Hardware passkey proven in Phase 1 |
+| New env var `SLASHER_PRIVATE_KEY` (throwaway testnet signer, used by the e2e) | `LocalKeyWallet` until Phase 5 wallet adapters; added to `.env.example` |
 
 ## Open items
 
@@ -76,13 +85,13 @@ Append-only record of what was done, what was observed, and what is still open. 
 - Read access for `metropolis@hackathon.monad.xyz`; push approval for commits after `e7b937e`.
 
 **Engineering**
-- **Contract: cap `limit` at 65535.** The circuit's `RangeCheck(16)` cannot represent a larger limit; today `enroll`/`changeLimit` accept `uint64`, so a member with limit > 65535 could never prove. Fix with the Phase 3 redeploy.
-- **Tree sync cost:** Monad testnet `eth_getLogs` is capped at 100 blocks. Syncing 28,384 blocks took 25.8 s (8 parallel requests) and grows ~216k blocks/day. Proposal (not built): store leaves on-chain (`leaves(i)`) or run an indexer, decided with the Phase 3 redeploy.
-- Proof against the on-chain root: needs a passkey-approved `enroll` of an agent whose `a0` we hold.
-- Measure real enroll gas on Monad with `eth_estimateGas` (Foundry model: 1,675,321 at depth 20; Monad bills the gas limit so receipts do not show usage).
-- Explorer source verification for the registry.
-- Slash needs a Merkle proof against the current root; enrolls can race it (design point for Phase 3).
+- **Slash economics.** The slasher pays ~0.284 MON in gas per slash (commit + reveal, billed on limits at ~102 gwei); at unit 0.01 MON and 50% share, a slash only pays off for stakes above ~0.57 MON. Before the demo: raise `UNIT`/minimum stake for the demo server, and cut reveal gas (it hashes the Merkle path 3×: our `_verify`, then zk-kit `_update` verifies again and rewrites).
+- ~~Contract: cap `limit` at 65535~~ done in v2. ~~Tree sync cost~~ done in v2 (`leaves()`). ~~Proof against the on-chain root~~ done in the Phase 3 e2e.
+- ~~Measure real enroll gas on Monad~~ done: `eth_estimateGas` 1,299,685 (v2).
+- ~~Explorer source verification~~ done for v2 (Sourcify `match`).
+- ~~Slash vs. enroll race on siblings~~ handled in v2: the reveal pays anyway and `removeSlashedLeaf` finishes the removal.
 - Delegated-access webhook for Dynamic (Phase 5, optional).
+- Testnet MON is low (deployer 0.586): a registry redeploy costs ~0.84 and a slash ~0.28. Use the faucet before the next redeploy (Phase 7 domain change).
 
 ## Test wallets and addresses (public, testnet only)
 - Deployer / passkey operator: `0x0437938E18Bd2E6d8Cad0921C8dc1e7Ff28Df7b2`
@@ -124,3 +133,36 @@ Append-only record of what was done, what was observed, and what is still open. 
 - **Limit of this evidence:** the on-chain leaf from Phase 1 was enrolled with a random `idCommitment` (no known `a0`), so it cannot prove. The protocol checks ran against a member appended to a copy of the live tree, so their root is local, not on-chain. Hashing compatibility is proven by the root match; a proof against an on-chain root needs a passkey `enroll` of a known-`a0` agent.
 - Proof time 1.17 s median is under the 2 s budget (Z2) on this machine; Windows/browser numbers not measured.
 - Environment notes: this run was on macOS (M2). Foundry is not installed here and the contract submodules are not checked out, so `forge test` was **not** run in this session (no contract changes were made). pnpm 11 needed `allowBuilds: esbuild: true` in `pnpm-workspace.yaml` (tsx dependency).
+
+### 2026-10-04 — Phase 3: slash (commit–reveal)
+- **Setup on this Mac:** installed Foundry 1.8.4 (`foundryup`), checked out contract submodules; baseline `forge test` 64 passed.
+- **Contracts (test-first):** `commitSlash`/`revealSlash`/`removeSlashedLeaf`, `Slashed` state, `SLASH_SHARE_BPS`, `totalBurned`, `MAX_LIMIT = 65535`, `leaves(from, count)`, `Member.index`. New `test/Slash.t.sol` (20 tests) incl. the searcher test. Two first-run failures were test bugs (block 1 − 1 = 0 meaning "no commit" in the naive harness; `expectRevert` consumed by the external Poseidon library call in a helper), fixed in the tests.
+  - `forge test`: **84 passed, 0 failed**.
+  - `forge coverage --ir-minimum`: `PasskeyAuth` 100% lines / 92.3% branches; `QuotaRegistry` 98.25% lines / 80.56% branches / 95.65% funcs.
+- **Off-chain:** `@quota/slasher` (`WalletAdapter`, `LocalKeyWallet`, `Broadcaster` with estimate × 1.15 limits and a 200 gwei max-fee floor, `CommitRevealPath`, `Slasher` queue with dedupe). `@quota/core` gets the v2 ABI, `MemberState`, `fetchTree` (reads `leaves()`, retries until the root matches).
+- **Dry run on anvil** (`--hardfork osaka --block-time 1`): all e2e checks PASS. Without `--block-time`, anvil only mines on transactions, so the commit→reveal wait never ends.
+- **Registry v2 deployed** to Monad testnet `0xd89BFd2f093015193d42EA51170D64d9242a40C6` and **verified on Sourcify** (`match`). ~0.84 MON.
+- **Monad e2e** `pnpm --filter @quota/slasher phase3` (output, 2026-10-04):
+  ```
+  chain 10143, registry 0xd89BFd2f093015193d42EA51170D64d9242a40C6, unit 0.01, slash share 5000 bps
+  PASS  agent enrolled at index 1, stake 0.03
+  PASS  tree from leaves() matches on-chain root (2 leaves)
+  PASS  agent leaf = on-chain leaf
+  PASS  honest request 1/3 verified against on-chain root (isKnownRoot via RPC)
+  PASS  honest request 2/3 verified against on-chain root (isKnownRoot via RPC)
+  PASS  honest request 3/3 verified against on-chain root (isKnownRoot via RPC)
+  PASS  request 4 reuses a message id → violation
+  PASS  server recovered the agent secret exactly (not printed)
+  PASS  reveal in block 68177704 > commit block 68177684
+  PASS  receiver got 0.015 MON = 5000 bps of 0.03
+  PASS  member state Slashed, stake 0
+  PASS  leaf removed; new root matches leaves()
+  PASS  leaf removed in the reveal
+  PASS  second violation for the same secret is not slashed twice
+  ```
+  Tx hashes and `eth_estimateGas` figures: `docs/deployments.md`.
+- **Two failed Monad attempts before that, both from async execution:**
+  1. `fetchTree` pinned reads to the newest block number and saw 0 leaves right after an enroll. Fixed: it now reads at latest and retries until the rebuilt root equals `root()`. This attempt **stranded ~0.43 MON** (not measured exactly) in a throwaway operator whose key lived only in memory, and left an orphan leaf 0 (stake 0.03 MON, secret unknown, harmless). Fixed: the script always sweeps the operator balance back in a `finally`.
+  2. The freshly funded operator's first tx was rejected with "Signer had insufficient balance": consensus checks balances against lagging state. Fixed: wait 4 blocks after funding. The sweep worked (0.475 MON returned).
+- **Re-ran everything after the changes:** `pnpm typecheck` clean; `pnpm test` core 9, server 5, slasher 3 passed; `pnpm phase2` all PASS against v1 (the event sync now took 234 s for 272,700 blocks, which is why v2 has `leaves()`). Proving on this run: median 705 ms (min 591, max 1421, n=10); verify median 16 ms.
+- Balances after: deployer 0.586 MON, slasher 0.016 MON (needs topping up before another slash), receiver 0.015 MON.
