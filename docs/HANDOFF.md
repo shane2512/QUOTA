@@ -1,6 +1,6 @@
 # QUOTA — Handoff for the next engineer / agent
 
-You are continuing a hackathon build (Monad Metropolis, Track 4). Deadline **14 Oct 2026, 09:29 IST**; submit by the evening of 13 Oct. Repo: `github.com/shane2512/QUOTA`. Phases 0–3 are done. **Start at Phase 4** (§9). Read §8 first: the slash works on-chain but is not yet economical at demo stake sizes.
+You are continuing a hackathon build (Monad Metropolis, Track 4). Deadline **14 Oct 2026, 09:29 IST**; submit by the evening of 13 Oct. Repo: `github.com/shane2512/QUOTA`. Phases 0–3 are done and independently verified (2026-10-05; see §8b). **Start at Phase 4** (§9). Read §8 first: the slash works on-chain but is not yet economical at demo stake sizes.
 
 ## 1. What QUOTA is (one paragraph)
 Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An operator locks a stake (approved by a human passkey, verified on-chain via the P256 precompile at `0x100`); the agent joins a Merkle tree. Each request carries an RLN-v2 zero-knowledge proof of "I am a member and this is request k of my N this epoch". Reusing a request number leaks the agent's secret `a0` (Shamir two-point recovery); anyone with `a0` can slash the stake. No issuer. The primary output is a primitive (contracts, SDKs, middleware), not a consumer app.
@@ -31,7 +31,7 @@ Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An opera
 | 0 Gates | Done (Qwen deferred by owner) |
 | 1 Contracts | Done. v2 verified on Sourcify; enroll gas measured on Monad (`eth_estimateGas` 1,299,685) |
 | 2 RLN proofs | Done, including a proof against an on-chain root (closed in the Phase 3 e2e) |
-| 3 Slash (commit–reveal) | Done. On-chain slash with reward on Monad testnet; searcher test in forge |
+| 3 Slash (commit–reveal) | Done. On-chain slash with reward on Monad testnet; searcher test in forge. **Independently re-verified 2026-10-05: forge 84/84, pnpm 17/17, typecheck clean, coverage confirmed.** |
 | 4 SDKs, middleware, demo MCP | **Next** |
 | 5–8 | Not started |
 
@@ -119,7 +119,16 @@ Deployed on Monad testnet (chain 10143):
 Exit checks, all PASS (full output in `docs/progress.md`; txs in `docs/deployments.md`):
 - **On-chain slash on Monad testnet (registry v2):** enroll → 3 RLN proofs verified against the **on-chain** root → 4th reuses a message id → server recovers `a0` → slasher commit (block 68177684) → reveal (block 68177704) → receiver +0.015 MON (50% of 0.03) → member `Slashed`, leaf removed in the reveal → a second violation is not slashed twice.
 - **Searcher (copy-and-steal), forge `test/Slash.t.sol`:** the naive one-step slash is stolen by a front-runner. On commit–reveal, the copied reveal, a same-block commit+reveal, and a later reveal all fail, and an exact copy still pays our receiver.
-- `forge test` 84 passed; coverage `QuotaRegistry` 98.25% lines / 80.56% branches, `PasskeyAuth` 100% lines. `pnpm test` 17 passed; typecheck clean.
+- `forge test` 84 passed; coverage `QuotaRegistry` 98.83% lines / 80.56% branches, `PasskeyAuth` 100% lines. `pnpm test` 17 passed; typecheck clean.
+
+## 8b. Phase 3 — independent re-verification (2026-10-05)
+A separate session re-ran all locally runnable Phase 3 checks from scratch (no code changes). Full report: `docs/phase3-test-report.md`.
+- `forge test`: **84 passed, 0 failed** ✅
+- `forge coverage` (standard, not `--ir-minimum`): `PasskeyAuth` 100.00% lines, `QuotaRegistry` 98.83% lines / 80.56% branches ✅
+- `pnpm test`: **17 passed, 0 failed** (core 9, server 5, slasher 3) ✅
+- `pnpm typecheck`: **clean** across all 4 packages ✅
+- Testnet e2e not re-run: slasher wallet at ~0.016 MON (needs ≥ 0.3 MON). Original PASS evidence stands.
+- **`forge coverage --ir-minimum` artefact:** `test_commit_firstBlockKept` fails only under IR instrumentation (`assertion failed: 1 != 6`) — the Yul IR rewriter changes `block.number` tracking. Passes under `forge test` and standard coverage. Not a functional defect.
 
 **Must fix before the demo (economics):**
 - The slasher pays ~0.284 MON gas per slash (commit 59,687 + reveal 2,725,641 limit at ~102 gwei).
