@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {InternalBinaryIMT, BinaryIMTData} from "@zk-kit/imt.sol/InternalBinaryIMT.sol";
 import {SNARK_SCALAR_FIELD} from "@zk-kit/imt.sol/Constants.sol";
+import {PoseidonT2} from "poseidon-solidity/PoseidonT2.sol";
 import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
 import {PasskeyAuth} from "./PasskeyAuth.sol";
 
@@ -14,7 +15,9 @@ import {PasskeyAuth} from "./PasskeyAuth.sol";
 /// Operator = msg.sender. Every custody action needs a fresh WebAuthn assertion bound to
 /// (chainId, this registry, operator, action, params, nonce); see PasskeyAuth.
 ///
-/// Slash (PRD C5) arrives in Phase 3 and uses the member records kept here.
+/// Slash (PRD C5, B2) is commit–reveal: a slash transaction carries the cheater's secret `a0`, so a block
+/// leader or RPC operator who sees it could copy it with their own receiver. The reward is bound to a
+/// receiver in an earlier-block commitment, so copying the reveal gains nothing. This is not BTX.
 contract QuotaRegistry {
     using InternalBinaryIMT for BinaryIMTData;
 
@@ -29,7 +32,8 @@ contract QuotaRegistry {
         None,
         Active,
         Unstaking,
-        Withdrawn
+        Withdrawn,
+        Slashed
     }
 
     struct Member {
@@ -38,6 +42,7 @@ contract QuotaRegistry {
         uint64 limit;
         uint64 unlockAt;
         uint128 stake;
+        uint32 index; // leaf index in the tree
         address destination;
     }
 
@@ -51,6 +56,9 @@ contract QuotaRegistry {
     uint256 public immutable UNIT; // wei of stake per message of per-epoch limit
     uint256 public immutable UNSTAKE_DELAY; // seconds between requestUnstake and unstake
     uint256 public immutable ROOT_TTL; // seconds a superseded root stays acceptable
+    uint256 public immutable SLASH_SHARE_BPS; // share of a slashed stake paid to the receiver; the rest is burned
+    /// RLN(20,16) RangeCheck(16): a limit above 2^16 - 1 could never produce a valid proof.
+    uint64 public constant MAX_LIMIT = 65535;
 
     BinaryIMTData internal tree;
     mapping(bytes32 => bool) internal allowedOrigin;
@@ -58,6 +66,10 @@ contract QuotaRegistry {
     mapping(uint256 => Member) internal _members;
     mapping(uint256 => bool) internal rootSeen;
     mapping(uint256 => uint256) internal rootSupersededAt;
+    mapping(uint256 => uint256) internal leafAt; // index → current leaf (0 = removed)
+    mapping(bytes32 => uint256) public slashCommitBlock; // commitment → block it was first seen
+    mapping(uint256 => bool) public pendingRemoval; // slashed while Active, leaf not yet removed
+    uint256 public totalBurned;
 
     event PasskeyRegistered(address indexed operator, uint256 x, uint256 y);
     event Enrolled(
@@ -69,6 +81,8 @@ contract QuotaRegistry {
     event LimitChanged(uint256 indexed idCommitment, uint64 limit);
     event UnstakeRequested(uint256 indexed idCommitment, address destination, uint64 unlockAt);
     event Unstaked(uint256 indexed idCommitment, address destination, uint256 amount);
+    event SlashCommitted(bytes32 indexed commitment, address indexed committer);
+    event Slashed(uint256 indexed idCommitment, address indexed receiver, uint256 reward, uint256 burned, bool leafRemoved);
 
     error PasskeyAlreadyRegistered();
     error BadPasskey();
@@ -85,6 +99,11 @@ contract QuotaRegistry {
     error BadDestination();
     error TransferFailed();
     error StakeOverflow();
+    error BadShare();
+    error NoCommitment();
+    error RevealTooEarly();
+    error NotSlashable();
+    error NotPendingRemoval();
 
     constructor(
         string memory rpId,
@@ -92,12 +111,15 @@ contract QuotaRegistry {
         uint256 depth,
         uint256 unit,
         uint256 unstakeDelay,
-        uint256 rootTtl
+        uint256 rootTtl,
+        uint256 slashShareBps
     ) {
+        if (slashShareBps >= 10_000) revert BadShare(); // a full refund would make self-slashing free
         RP_ID_HASH = sha256(bytes(rpId));
         UNIT = unit;
         UNSTAKE_DELAY = unstakeDelay;
         ROOT_TTL = rootTtl;
+        SLASH_SHARE_BPS = slashShareBps;
         for (uint256 i; i < origins.length; i++) {
             allowedOrigin[keccak256(bytes(origins[i]))] = true;
         }
@@ -117,6 +139,17 @@ contract QuotaRegistry {
 
     function depth() external view returns (uint256) {
         return tree.depth;
+    }
+
+    /// @notice Leaves [from, from+count) clipped to the tree size, so clients sync with reads instead of event scans.
+    function leaves(uint256 from, uint256 count) external view returns (uint256[] memory out) {
+        uint256 n = tree.numberOfLeaves;
+        if (from >= n) return out;
+        if (count > n - from) count = n - from;
+        out = new uint256[](count);
+        for (uint256 i; i < count; i++) {
+            out[i] = leafAt[from + i];
+        }
     }
 
     function members(uint256 idCommitment) external view returns (Member memory) {
@@ -185,7 +218,7 @@ contract QuotaRegistry {
         payable
     {
         if (treeId != 0) revert UnknownTree();
-        if (limit == 0) revert BadLimit();
+        if (limit == 0 || limit > MAX_LIMIT) revert BadLimit();
         if (idCommitment == 0 || idCommitment >= SNARK_SCALAR_FIELD) revert BadCommitment();
         if (msg.value < uint256(limit) * UNIT) revert StakeTooLow();
         if (msg.value > type(uint128).max) revert StakeOverflow();
@@ -201,8 +234,10 @@ contract QuotaRegistry {
 
         uint256 prev = tree.root;
         uint256 index = tree.numberOfLeaves;
+        m.index = uint32(index);
         uint256 leaf = PoseidonT3.hash([idCommitment, uint256(limit)]);
         tree._insert(leaf);
+        leafAt[index] = leaf;
         _rootChanged(prev);
         emit Enrolled(idCommitment, msg.sender, limit, msg.value, index, leaf);
         emit LeafSet(index, leaf);
@@ -229,7 +264,7 @@ contract QuotaRegistry {
         Member storage m = _members[idCommitment];
         if (m.operator != msg.sender) revert NotOperator();
         if (m.state != State.Active) revert NotActive();
-        if (newLimit == 0) revert BadLimit();
+        if (newLimit == 0 || newLimit > MAX_LIMIT) revert BadLimit();
         if (m.stake < uint256(newLimit) * UNIT) revert StakeTooLow();
 
         _checkPasskey(msg.sender, Action.ChangeLimit, abi.encode(idCommitment, newLimit), a);
@@ -239,6 +274,7 @@ contract QuotaRegistry {
         uint256 prev = tree.root;
         tree._update(oldLeaf, newLeaf, siblings, path);
         _rootChanged(prev);
+        leafAt[_index(path)] = newLeaf;
         m.limit = newLimit;
         emit LimitChanged(idCommitment, newLimit);
         emit LeafSet(_index(path), newLeaf);
@@ -263,6 +299,7 @@ contract QuotaRegistry {
         uint256 prev = tree.root;
         tree._remove(PoseidonT3.hash([idCommitment, uint256(m.limit)]), siblings, path);
         _rootChanged(prev);
+        leafAt[_index(path)] = 0;
         m.state = State.Unstaking;
         m.destination = destination;
         m.unlockAt = uint64(block.timestamp + UNSTAKE_DELAY);
@@ -284,7 +321,76 @@ contract QuotaRegistry {
         emit Unstaked(idCommitment, dest, amount);
     }
 
+    // ------------------------------------------------------------------ slash
+
+    /// @notice Step 1: commit to keccak256(abi.encode(a0, receiver, salt)). Reveals nothing about a0.
+    function commitSlash(bytes32 commitment) external {
+        if (slashCommitBlock[commitment] == 0) {
+            slashCommitBlock[commitment] = block.number;
+            emit SlashCommitted(commitment, msg.sender);
+        }
+    }
+
+    /// @notice Step 2 (a later block): reveal the recovered secret. Pays SLASH_SHARE_BPS of the stake to the
+    /// committed receiver and burns the rest. Works while Active or Unstaking, so unstaking cannot dodge it.
+    /// If the member is still in the tree, the leaf is removed when `siblings`/`path` match the current root;
+    /// otherwise (root moved since they were built) the payout still happens and `removeSlashedLeaf` finishes.
+    function revealSlash(
+        uint256 a0,
+        address payable receiver,
+        bytes32 salt,
+        uint256[] calldata siblings,
+        uint8[] calldata path
+    ) external {
+        bytes32 c = keccak256(abi.encode(a0, receiver, salt));
+        uint256 committedAt = slashCommitBlock[c];
+        if (committedAt == 0) revert NoCommitment();
+        if (committedAt >= block.number) revert RevealTooEarly();
+        delete slashCommitBlock[c];
+
+        uint256 id = PoseidonT2.hash([a0]);
+        Member storage m = _members[id];
+        State st = m.state;
+        if (st != State.Active && st != State.Unstaking) revert NotSlashable();
+
+        uint256 stake = m.stake;
+        uint256 reward = stake * SLASH_SHARE_BPS / 10_000;
+        m.state = State.Slashed;
+        m.stake = 0;
+        totalBurned += stake - reward;
+
+        bool removed = st != State.Active;
+        if (st == State.Active) {
+            uint256 leaf = PoseidonT3.hash([id, uint256(m.limit)]);
+            if (siblings.length == tree.depth && path.length == tree.depth && tree._verify(leaf, siblings, path)) {
+                _removeLeaf(leaf, siblings, path);
+                removed = true;
+            } else {
+                pendingRemoval[id] = true;
+            }
+        }
+        emit Slashed(id, receiver, reward, stake - reward, removed);
+        (bool ok,) = receiver.call{value: reward}("");
+        if (!ok) revert TransferFailed();
+    }
+
+    /// @notice Remove the leaf of a member slashed while its siblings were stale. Anyone may call.
+    function removeSlashedLeaf(uint256 idCommitment, uint256[] calldata siblings, uint8[] calldata path) external {
+        if (!pendingRemoval[idCommitment]) revert NotPendingRemoval();
+        delete pendingRemoval[idCommitment];
+        _removeLeaf(PoseidonT3.hash([idCommitment, uint256(_members[idCommitment].limit)]), siblings, path);
+    }
+
     // --------------------------------------------------------------- internal
+
+    function _removeLeaf(uint256 leaf, uint256[] calldata siblings, uint8[] calldata path) private {
+        uint256 prev = tree.root;
+        tree._remove(leaf, siblings, path);
+        _rootChanged(prev);
+        uint256 idx = _index(path);
+        leafAt[idx] = 0;
+        emit LeafSet(idx, 0);
+    }
 
     function _rootChanged(uint256 prev) private {
         uint256 nr = tree.root;

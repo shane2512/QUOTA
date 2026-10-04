@@ -16,7 +16,8 @@ contract Deploy is Script {
             vm.envOr("TREE_DEPTH", uint256(20)),
             vm.envOr("STAKE_UNIT_WEI", uint256(0.01 ether)),
             vm.envOr("UNSTAKE_DELAY_S", uint256(2 hours)),
-            vm.envOr("ROOT_TTL_S", uint256(10 minutes))
+            vm.envOr("ROOT_TTL_S", uint256(10 minutes)),
+            vm.envOr("SLASH_SHARE_BPS", uint256(5000))
         );
         vm.stopBroadcast();
         console.log("QuotaRegistry", address(r));

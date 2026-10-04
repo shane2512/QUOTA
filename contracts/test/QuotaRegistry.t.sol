@@ -32,6 +32,7 @@ abstract contract Base is Test {
     uint256 constant UNIT = 0.01 ether;
     uint256 constant DELAY = 1 days;
     uint256 constant TTL = 1 hours;
+    uint256 constant SHARE = 5000; // 50% to the slasher
 
     uint8 constant A_REGISTER = 0;
     uint8 constant A_ENROLL = 1;
@@ -52,7 +53,7 @@ abstract contract Base is Test {
     function _deploy() internal returns (QuotaRegistry r) {
         string[] memory o = new string[](1);
         o[0] = ORIGIN;
-        r = new QuotaRegistry(RP, o, DEPTH, UNIT, DELAY, TTL);
+        r = new QuotaRegistry(RP, o, DEPTH, UNIT, DELAY, TTL, SHARE);
     }
 
     // ---- passkey helpers (challenge computed independently of the contract) ----
@@ -357,7 +358,7 @@ contract EnrollTest is Base {
     function test_enroll_gas_depth20() public {
         string[] memory o = new string[](1);
         o[0] = ORIGIN;
-        QuotaRegistry big = new QuotaRegistry(RP, o, 20, UNIT, DELAY, TTL);
+        QuotaRegistry big = new QuotaRegistry(RP, o, 20, UNIT, DELAY, TTL, SHARE);
         PasskeyAuth.Assertion memory r =
             _assertionFor(_challenge(address(big), op, A_REGISTER, abi.encode(x, y), 0), PK);
         vm.prank(op);
