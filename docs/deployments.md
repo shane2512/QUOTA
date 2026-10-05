@@ -64,6 +64,43 @@ Also fixed: Windows `import.meta.url` path bug (`fileURLToPath`) in devtools and
 | `revealSlash` | `0xfee479d1e5cac3771eb46ac1a996f3ed872c45e6fdb93668ede121bb51a83430` | block 68347567 (+22 from commit), receiver `0x05c2bF6F50D3C177C5AAB0Ade971C82F691411C8` +0.015 MON; member Slashed; leaf removed |
 | Sweep back to funder | `0xf05078b0a7db9fa9e922b1602f7edac36b05680b1ec800a146de16b2a5101fe2` | 0.278 MON returned |
 
+## Phase 4 live demo test: MCP server + agent (registry v2, 2026-10-05)
+
+### Index 2 slash — Windows reset bug (accidental)
+
+Demo agent (index 2, `AGENT_PRIVATE_KEY=0x2765...`) slashed during Phase 4 demo test. Root cause: `Remove-Item` on `nullifiers.db` while server still held a file handle (Windows). Server retained old nullifiers; agent re-sent same message IDs with different payloads → same nullifier, different x → violation. Slashed by `QUOTA_SLASH=1` server.
+
+| Step | Tx |
+|---|---|
+| `commitSlash` (server-initiated) | `0x100aa65ed223145ff6bd65941ee04a454bb9be3b055fcdaa63376394913e6376` |
+| `revealSlash` | `0x70869a4f04ad729fa046ec998cdcfad3b2fa423eb11d3288f5867a3a9bde97d9` |
+
+**Lesson learned:** always stop the server before deleting state files. Documented in HANDOFF §6.
+
+### Index 4 enroll and slash — correct --cheat demo
+
+Re-enrolled a fresh agent (`AGENT_PRIVATE_KEY=0x5339...`), index 4, limit 5, stake 0.05 MON. Then ran proper cheat demo (server stopped → state cleared → server restarted with `QUOTA_SLASH=1` → agent `--cheat`): **5 × OK, 1 × REJECTED (violation 429)** → server slashed on-chain.
+
+| Step | Tx |
+|---|---|
+| Fund operator `0xaaa0408f...` | `0x5399bfdd8ff3c7528dd9720f1ad78ed18a7de6510fc936f51b5695328f455fdc` |
+| `registerPasskey` | `0x894d00634ff523c458ed133060e03da5f8885e6162177dca46bcd4f06bdb99bf` |
+| `enroll` (index 4, stake 0.05) | `0xe18f27a2a76112c6a1a1c27848720afa24b81f5f7d667e69fe1fb3bd7e6b13da` |
+| `sweep` | `0xe1b70fcd19a7b3681ef7cfe6ffb674e11e2e53cfcc38cc25313facb9045eedce` |
+| `commitSlash` (server-initiated, `QUOTA_SLASH=1`) | `0x2e1dd2bb65d6975ae083b2bb9d2f59037227230cdccf1b7a6c6154304ade6cd9` |
+| `revealSlash` | `0x17c8d78c8d4b02906a6e42e18aac96904c3b5a2ef6ecf1efab6c33ee21d54ca0` |
+
+### Index 5 enroll — clean Phase 5 demo agent
+
+Fresh agent (`AGENT_PRIVATE_KEY=0x4931...`), idCommitment `15477875465663548400315948804121926270608349604082804923542483643861837262875`, **index 5, limit 5, stake 0.05 MON**. This is the active demo agent for Phase 5.
+
+| Step | Tx |
+|---|---|
+| Fund operator `0x568a2489...` | `0x9f6c7895527e7b902483ffd3ddc1d54ca5c46e33ccf9f5d9ffd2c8e130743b73` |
+| `registerPasskey` | `0xb7066095d57a9004b080eb31c4b3ed1b0056effbba057303e7547e24b5667fa8` |
+| `enroll` (index 5, stake 0.05) | `0x74261dd7023b62501f87a3e3f241943e0aca5a11f1f310a5cf5f1e3fe1545438` |
+| `sweep` | `0x85d8dfc3ba916b1c33477205daf83c00af16d443950dbacd796dc340ca0ea863` |
+
 ## Gas
 
 - Foundry model, depth 20 enroll (v1): **1,675,321 gas** (not a Monad measurement).

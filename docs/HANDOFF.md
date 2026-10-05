@@ -33,7 +33,7 @@ Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An opera
 | 1 Contracts | Done. v2 verified on Sourcify; enroll gas measured on Monad (`eth_estimateGas` 1,299,685) |
 | 2 RLN proofs | Done, including a proof against an on-chain root (closed in the Phase 3 e2e) |
 | 3 Slash (commit–reveal) | Done. On-chain slash with reward on Monad testnet; searcher test in forge. **Independently re-verified 2026-10-05: forge 84/84, pnpm 17/17, typecheck clean, coverage confirmed.** |
-| 4 SDKs, middleware, demo MCP | Done. Express/Hono/MCP middleware, demo MCP server live against v2, quickstarts; clean-checkout quickstart passed (human-stranger timing still open). **Re-verified 2026-10-05: forge 84/84, pnpm 26/26, typecheck clean, phase3 e2e 14/14 PASS on testnet. Windows path bug (fileURLToPath) found and fixed.** |
+| 4 SDKs, middleware, demo MCP | Done. Express/Hono/MCP middleware, demo MCP server live against v2, quickstarts; clean-checkout quickstart passed (human-stranger timing still open). **Re-verified 2026-10-05: forge 84/84, pnpm 26/26, typecheck clean, phase3 e2e 14/14 PASS on testnet. MCP live demo: 5 × OK + 1 × REJECTED (violation 429) + server-initiated on-chain slash. Windows path bug (fileURLToPath) found and fixed. Active demo agent index 5.** |
 | 5 Wallet integrations | **Next** |
 | 6–8 | Not started |
 
@@ -107,6 +107,7 @@ Deployed on Monad testnet (chain 10143):
 - **Never keep a funded throwaway key only in memory.** The e2e sweeps the operator's balance back in a `finally`.
 - **anvil:** run with `--hardfork osaka --block-time 1`. Osaka is needed for P256. Without block time, anvil only mines on transactions, so the commit→reveal wait never ends.
 - **Persist the agent's message-id count** (`FileUsageStore`). With the in-memory default, a restarted agent reuses id 0 within the epoch and the server treats it as a violation, i.e. the agent slashes itself. If you reset a demo, delete the agent usage file **and** the server's nullifier DB together.
+- **Stop the server before deleting state files (Windows).** On Windows, `Remove-Item` on a SQLite file held open by the server process does not actually delete the file until the handle is closed. If you delete `nullifiers.db` while the server is running, the new server process opens the same file and finds the old nullifiers. An agent re-sending the same message IDs with different payloads then triggers violations (same nullifier, different x). Always: `kill server → delete files → restart server`. Found during Phase 4 demo testing.
 - The demo-mcp server and agent load `../../.env` but **shell env wins** (`process.loadEnvFile` does not override). That is how the anvil rehearsal used public dev keys without touching `.env`.
 - pnpm 11 enforces a minimum release age. A too-new package version makes it add a `minimumReleaseAgeExclude` entry to `pnpm-workspace.yaml`. Don't keep that: pin an older version instead (hono is pinned to 4.13.12 for this reason).
 - `node:sqlite` needs Node ≥ 22.13 (prints an ExperimentalWarning).
@@ -201,6 +202,52 @@ A separate session re-ran all locally runnable Phase 3 checks from scratch (no c
 Only triggered on Windows with tsx. Typecheck clean after fix.
 
 **Post-test balances:** deployer 5.159 MON, slasher 9.734 MON, agent wallet 0 MON.
+
+## 8e. Phase 4 — live MCP demo test (2026-10-05)
+
+**Full end-to-end demo MCP server test. All Phase 4 features verified live.**
+
+### Honest run (5 × OK)
+```
+agent idCommitment 7351518591..., limit 5/epoch, remaining now 5
+OK  "query 1" (proof 2334 ms) -> Wikipedia results
+OK  "query 2" (proof 375 ms)
+OK  "query 3" (proof 361 ms)
+OK  "query 4" (proof 360 ms)
+OK  "query 5" (proof 367 ms)
+REJECTED "cheat 6" (proof 355 ms) -> quota: request rejected (violation, HTTP-equivalent 429)
+```
+
+### Server log (QUOTA_SLASH=1)
+```
+[violation] message-id reuse; idCommitment 7351518591... (secret recovered, not logged)
+[slash] ...: commit 0x2e1dd2bb65d6975ae... reveal 0x17c8d78c8d4b02906a...
+```
+
+### On-chain verification
+- Agent (index 4, idCommitment `7351518591...`): state=4 (Slashed) ✅
+- commit tx: `0x2e1dd2bb65d6975ae083b2bb9d2f59037227230cdccf1b7a6c6154304ade6cd9`
+- reveal tx: `0x17c8d78c8d4b02906a6e42e18aac96904c3b5a2ef6ecf1efab6c33ee21d54ca0`
+
+### REST twin (no proof → 401)
+```
+GET /api/search?q=test  ->  HTTP 401
+```
+
+### Client-side STOP (quota exhausted)
+```
+STOP  "overflow query": quota exhausted for this epoch (client refuses to reuse a message id)
+```
+
+### Bug found: Windows SQLite file-handle reset
+`Remove-Item nullifiers.db` while server held the file open did not delete it on Windows. New server session found old nullifiers; agent re-sent same message IDs with different payloads → violation. Correct procedure: **stop server first, then delete state files**. Added to §6 gotchas.
+
+### Fresh demo agent enrolled for Phase 5
+- `AGENT_PRIVATE_KEY=0x4931...` → idCommitment `15477875465663548400315948804121926270608349604082804923542483643861837262875`
+- **Index 5, limit 5, stake 0.05 MON** (Active, not slashed)
+- Enroll tx: `0x74261dd7023b62501f87a3e3f241943e0aca5a11f1f310a5cf5f1e3fe1545438`
+
+**Post-test balances:** deployer 4.933 MON, slasher 9.228 MON.
 
 ## 9. Phase 5 — what to do next (wallet integrations)
 Exit check: the end-to-end flow runs with Privy on the agent side and Dynamic on the service side. No private keys in `.env` except sponsor auth keys.
