@@ -5,7 +5,9 @@
 ///
 /// Env (../../.env, then process env): MONAD_RPC_URL, QUOTA_REGISTRY_ADDRESS
 /// Optional: PORT (8787), QUOTA_SERVER_ID (demo-mcp.quota), QUOTA_EPOCH_SECONDS (3600), QUOTA_DB (data/nullifiers.db),
-///           QUOTA_SLASH=1 + SLASHER_PRIVATE_KEY [+ SLASH_RECEIVER] to slash violators.
+///           QUOTA_SLASH=1 to slash violators, signing with the Dynamic server wallet (DYNAMIC_ENVIRONMENT_ID,
+///           DYNAMIC_API_TOKEN, DYNAMIC_SLASHER_WALLET, DYNAMIC_WALLET_PASSWORD) or, if those are unset,
+///           SLASHER_PRIVATE_KEY. Rewards go to SLASH_RECEIVER or the slasher wallet itself.
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,7 +19,8 @@ import { z } from "zod";
 import { loadVerificationKey } from "@quota/core";
 import { QuotaVerifier, RegistryRootChecker, quotaExpress, quotaTool, type Violation } from "@quota/server";
 import { SqliteNullifierStore } from "@quota/server/sqlite";
-import { Broadcaster, CommitRevealPath, LocalKeyWallet, Slasher } from "@quota/slasher";
+import { Broadcaster, CommitRevealPath, LocalKeyWallet, Slasher, type WalletAdapter } from "@quota/slasher";
+import { DynamicServiceWallet } from "@quota/wallets/dynamic";
 
 try {
   process.loadEnvFile(fileURLToPath(new URL("../../../.env", import.meta.url)));
@@ -37,7 +40,19 @@ const chain = createPublicClient({ transport: http(need("MONAD_RPC_URL")) });
 // ---- optional slasher
 let slasher: Slasher | undefined;
 if (process.env.QUOTA_SLASH === "1") {
-  const tx = new Broadcaster(chain, new LocalKeyWallet(need("SLASHER_PRIVATE_KEY") as Hex));
+  let wallet: WalletAdapter;
+  if (process.env.DYNAMIC_SLASHER_WALLET) {
+    const d = await DynamicServiceWallet.connect({
+      environmentId: need("DYNAMIC_ENVIRONMENT_ID"),
+      apiToken: need("DYNAMIC_API_TOKEN"),
+      metadataB64: need("DYNAMIC_SLASHER_WALLET"),
+      password: need("DYNAMIC_WALLET_PASSWORD"),
+    });
+    d.onRetry = (n, err) => console.log(`[slash] dynamic sign attempt ${n} failed (${err.slice(0, 80)}); retrying`);
+    wallet = d;
+  } else wallet = new LocalKeyWallet(need("SLASHER_PRIVATE_KEY") as Hex);
+  console.log(`[slash] slasher wallet ${wallet.address} (${process.env.DYNAMIC_SLASHER_WALLET ? "Dynamic server wallet" : "local key"})`);
+  const tx = new Broadcaster(chain, wallet, { maxFeePerGas: process.env.QUOTA_MAX_FEE_GWEI ? BigInt(process.env.QUOTA_MAX_FEE_GWEI) * 1_000_000_000n : undefined });
   slasher = new Slasher({
     client: chain,
     registry,

@@ -16,6 +16,9 @@ export interface BroadcasterOptions {
   gasHeadroom?: number; // default 0.15
   /// Monad testnet rejected a 10 gwei max fee; gas price is ~102 gwei. Floor for maxFeePerGas.
   minMaxFeePerGas?: bigint; // default 200 gwei
+  /// Fixed max fee per gas (overrides the estimate and the floor). Lowers the balance a sender must hold,
+  /// since Monad checks limit × max fee + value up front.
+  maxFeePerGas?: bigint;
 }
 
 export interface Sent {
@@ -44,7 +47,7 @@ export class Broadcaster {
     const headroom = BigInt(Math.round((this.o.gasHeadroom ?? 0.15) * 1000));
     const gasLimit = gasEstimate + (gasEstimate * headroom) / 1000n;
     const floor = this.o.minMaxFeePerGas ?? 200_000_000_000n;
-    const maxFeePerGas = fees.maxFeePerGas > floor ? fees.maxFeePerGas : floor;
+    const maxFeePerGas = this.o.maxFeePerGas ?? (fees.maxFeePerGas > floor ? fees.maxFeePerGas : floor);
     const raw = await this.wallet.signTransaction({
       type: "eip1559",
       chainId,

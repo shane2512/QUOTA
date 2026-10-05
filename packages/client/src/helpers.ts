@@ -15,10 +15,18 @@ import type { QuotaClient } from "./index.ts";
 /// Fixed message the agent's wallet signs to derive its RLN secret (PRD W2). Same string as the Privy gate test.
 export const SECRET_MESSAGE = "QUOTA/rln-secret/v1";
 
-/// a0 = hashToField(signature over SECRET_MESSAGE). Recoverable from the wallet, never stored.
-/// Requires deterministic signatures (RFC 6979; verified for Privy in gates.md G2).
-export async function deriveSecret(signMessage: (message: string) => Promise<Hex>): Promise<bigint> {
-  const a0 = hashToField(await signMessage(SECRET_MESSAGE));
+/// Message for identity number `index`: SECRET_MESSAGE for 0 (backwards compatible), SECRET_MESSAGE + "/n" after.
+/// A slashed or withdrawn idCommitment can never re-enroll, so an agent rotates to the next index to stake again;
+/// a fresh index is also a fresh, unlinkable identity.
+export function secretMessage(index = 0): string {
+  if (!Number.isInteger(index) || index < 0) throw new Error("identity index must be a non-negative integer");
+  return index === 0 ? SECRET_MESSAGE : `${SECRET_MESSAGE}/${index}`;
+}
+
+/// a0 = hashToField(signature over secretMessage(index)). Recoverable from the wallet, never stored.
+/// Requires deterministic signatures (RFC 6979; verified for Privy in gates.md G2 and Phase 5).
+export async function deriveSecret(signMessage: (message: string) => Promise<Hex>, index = 0): Promise<bigint> {
+  const a0 = hashToField(await signMessage(secretMessage(index)));
   if (a0 === 0n) throw new Error("derived secret is zero");
   return a0;
 }

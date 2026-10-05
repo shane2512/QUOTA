@@ -2,7 +2,7 @@
 /// QuotaRegistry verifies (authenticatorData, clientDataJSON, low-s r/s). It lets scripts drive the registry
 /// without a human tap. It is NOT a passkey: no secure hardware, no user verification. Phase 1 proved a real
 /// Windows Hello passkey on-chain (docs/deployments.md); this exists so the slash e2e can run unattended.
-import { createHash, generateKeyPairSync, sign, type KeyObject } from "node:crypto";
+import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign, type KeyObject } from "node:crypto";
 import { encodeAbiParameters, keccak256, type Address, type Hex } from "viem";
 
 const N = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551n;
@@ -24,15 +24,23 @@ export class SoftPasskey {
   readonly y: bigint;
   #key: KeyObject;
 
+  /// `pkcs8` (base64 DER) restores a saved key, standing in for an operator's device keeping its passkey.
   constructor(
     readonly rpId: string,
     readonly origin: string,
+    pkcs8?: string,
   ) {
-    const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
-    this.#key = privateKey;
-    const jwk = publicKey.export({ format: "jwk" });
+    this.#key = pkcs8
+      ? createPrivateKey({ key: Buffer.from(pkcs8, "base64"), format: "der", type: "pkcs8" })
+      : generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey;
+    const jwk = createPublicKey(this.#key).export({ format: "jwk" });
     this.x = b64urlToBig(jwk.x!);
     this.y = b64urlToBig(jwk.y!);
+  }
+
+  /// TEST TOOLING: base64 PKCS8 of the private key, for DEMO_OPERATOR_PASSKEY. Never log it.
+  exportPkcs8(): string {
+    return (this.#key.export({ format: "der", type: "pkcs8" }) as Buffer).toString("base64");
   }
 
   /// challenge = keccak256(abi.encode(chainId, registry, operator, action, keccak256(params), nonce))

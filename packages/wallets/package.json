@@ -1,0 +1,31 @@
+{
+  "name": "@quota/wallets",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Wallet adapters (PRD S4): Privy agent wallet, Dynamic service wallet. Sign-only; broadcast stays in @quota/slasher's Broadcaster.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./privy": "./src/privy.ts",
+    "./dynamic": "./src/dynamic.ts"
+  },
+  "scripts": {
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@dynamic-labs-wallet/node-evm": "1.1.28",
+    "@privy-io/node": "0.35.0",
+    "@quota/client": "workspace:*",
+    "@quota/core": "workspace:*",
+    "@quota/slasher": "workspace:*",
+    "viem": "^2.57.2",
+    "@quota/server": "workspace:*",
+    "@quota/devtools": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

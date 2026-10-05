@@ -17,6 +17,12 @@ export interface EnrollOptions {
   origin?: string; // default http://localhost:3777 (allowed by the dev registry)
   gasBudget?: bigint; // operator gas money, default 0.45 MON (balance check uses limit × max fee)
   log?: (line: string) => void;
+  /// Use this wallet as the operator (e.g. a Privy agent wallet) instead of a fresh throwaway key. It is funded only
+  /// up to `operatorBalance` if below it, and nothing is swept back.
+  operator?: Broadcaster;
+  operatorBalance?: bigint;
+  /// The operator's (software) passkey. If it is already registered for the operator, registration is skipped.
+  passkey?: SoftPasskey;
 }
 
 export interface EnrollResult {
@@ -36,23 +42,32 @@ export async function enrollWithSoftPasskey(o: EnrollOptions): Promise<EnrollRes
   const chainId = await o.client.getChainId();
   const unit = await read<bigint>("UNIT");
   const stake = o.limit * unit;
-  const opWallet = new LocalKeyWallet(generatePrivateKey());
-  const op = new Broadcaster(o.client, opWallet);
+  const op = o.operator ?? new Broadcaster(o.client, new LocalKeyWallet(generatePrivateKey()));
+  const opWallet = op.wallet;
   const txs: EnrollResult["txs"] = [];
-  const funded = await o.funder.send(opWallet.address, "0x", stake + (o.gasBudget ?? 450_000_000_000_000_000n));
-  txs.push({ label: "fund operator", sent: funded });
-  log(`funded throwaway operator ${opWallet.address}`);
-  try {
-    // Monad checks balances against lagging state (async execution): wait before the new account sends.
+  const target = o.operator ? (o.operatorBalance ?? 0n) : stake + (o.gasBudget ?? 450_000_000_000_000_000n);
+  const have = await o.client.getBalance({ address: opWallet.address });
+  if (have < target) {
+    const funded = await o.funder.send(opWallet.address, "0x", target - have);
+    txs.push({ label: "fund operator", sent: funded });
+    log(`funded operator ${opWallet.address} with ${formatEther(target - have)} MON`);
+    // Monad checks balances against lagging state (async execution): wait before the funded account sends.
     while ((await o.client.getBlockNumber()) < funded.receipt.blockNumber + 4n) await new Promise((r) => setTimeout(r, 400));
-    const pk = new SoftPasskey(o.rpId, o.origin ?? "http://localhost:3777");
+  }
+  try {
+    const pk = o.passkey ?? new SoftPasskey(o.rpId, o.origin ?? "http://localhost:3777");
+    const [px, py] = (await read<[bigint, bigint]>("passkeys", [opWallet.address])) as unknown as [bigint, bigint];
+    const registered = px !== 0n;
+    if (registered && (px !== pk.x || py !== pk.y)) throw new Error("operator has a different passkey registered (pass the matching `passkey`)");
     const sign = async (action: number, params: `0x${string}`) =>
       pk.assert(SoftPasskey.challenge(chainId, o.registry, opWallet.address, action, params, await read<bigint>("passkeyNonce", [opWallet.address])));
-    const regParams = encodeAbiParameters([{ type: "uint256" }, { type: "uint256" }], [pk.x, pk.y]);
-    txs.push({
-      label: "registerPasskey",
-      sent: await op.send(o.registry, encodeFunctionData({ abi: registryAbi, functionName: "registerPasskey", args: [pk.x, pk.y, await sign(Action.RegisterPasskey, regParams)] })),
-    });
+    if (!registered) {
+      const regParams = encodeAbiParameters([{ type: "uint256" }, { type: "uint256" }], [pk.x, pk.y]);
+      txs.push({
+        label: "registerPasskey",
+        sent: await op.send(o.registry, encodeFunctionData({ abi: registryAbi, functionName: "registerPasskey", args: [pk.x, pk.y, await sign(Action.RegisterPasskey, regParams)] })),
+      });
+    }
     const enrollParams = encodeAbiParameters(
       [{ type: "uint256" }, { type: "uint64" }, { type: "uint256" }, { type: "uint256" }],
       [o.idCommitment, o.limit, 0n, stake],
@@ -69,13 +84,16 @@ export async function enrollWithSoftPasskey(o: EnrollOptions): Promise<EnrollRes
     log(`enrolled at index ${m.index}, stake ${formatEther(stake)} MON`);
     return { operator: opWallet.address, index: m.index, stake, txs };
   } finally {
-    const fees = await o.client.estimateFeesPerGas();
-    const maxFee = fees.maxFeePerGas > 200_000_000_000n ? fees.maxFeePerGas : 200_000_000_000n;
-    const left = (await o.client.getBalance({ address: opWallet.address })) - 24_150n * maxFee;
-    if (left > 0n) {
-      const s = await op.send(o.funder.wallet.address, "0x", left);
-      txs.push({ label: "sweep operator", sent: s });
-      log(`swept ${formatEther(left)} MON back to the funder`);
+    // Sweep only throwaway operators; a provided operator (e.g. a Privy wallet) keeps its balance.
+    if (!o.operator) {
+      const fees = await o.client.estimateFeesPerGas();
+      const maxFee = fees.maxFeePerGas > 200_000_000_000n ? fees.maxFeePerGas : 200_000_000_000n;
+      const left = (await o.client.getBalance({ address: opWallet.address })) - 24_150n * maxFee;
+      if (left > 0n) {
+        const s = await op.send(o.funder.wallet.address, "0x", left);
+        txs.push({ label: "sweep operator", sent: s });
+        log(`swept ${formatEther(left)} MON back to the funder`);
+      }
     }
   }
 }

@@ -33,3 +33,16 @@ test("FileUsageStore: a restarted agent continues its message-id count instead o
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("identity rotation: index 0 keeps the original message; other indexes give different secrets", async () => {
+  const { secretMessage } = await import("../src/index.ts");
+  const a = privateKeyToAccount(`0x${"33".repeat(32)}`);
+  assert.equal(secretMessage(0), "QUOTA/rln-secret/v1");
+  assert.equal(secretMessage(2), "QUOTA/rln-secret/v1/2");
+  assert.throws(() => secretMessage(-1));
+  const s0 = await deriveSecret((m) => a.signMessage({ message: m }));
+  const s0b = await deriveSecret((m) => a.signMessage({ message: m }), 0);
+  const s1 = await deriveSecret((m) => a.signMessage({ message: m }), 1);
+  assert.equal(s0 === s0b, true);
+  assert.equal(s0 === s1, false);
+});
