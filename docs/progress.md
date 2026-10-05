@@ -97,7 +97,6 @@ Append-only record of what was done, what was observed, and what is still open. 
 - Qwen: credits, open-weight, or drop (before Phase 7).
 - Nansen credits (otherwise Screener is labels-only).
 - Named external integrator: deferred by the owner (see the Phase 4 re-verification).
-- A human stranger to time the service quickstart (agent-run clean checkout passed).
 - Final public domain for passkeys (before Phase 7).
 - Cleanverse invitation code, only if reopening.
 - Community group, or skip.
