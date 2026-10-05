@@ -3,6 +3,7 @@
 ///        add --cheat to keep calling past the limit (reuses message ids → the server recovers the secret).
 /// Env (../../.env): MONAD_RPC_URL, QUOTA_REGISTRY_ADDRESS, AGENT_PRIVATE_KEY. Optional: QUOTA_SERVER_URL
 /// (http://localhost:8787/mcp), QUOTA_SERVER_ID (demo-mcp.quota), QUOTA_EPOCH_SECONDS (3600).
+import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createPublicClient, http, type Address, type Hex } from "viem";
@@ -11,7 +12,7 @@ import { FileUsageStore, QuotaClient, QuotaExhausted, RegistryMembership, derive
 import { identityCommitment, loadArtifacts, registryAbi, MemberState } from "@quota/core";
 
 try {
-  process.loadEnvFile(new URL("../../../.env", import.meta.url).pathname);
+  process.loadEnvFile(fileURLToPath(new URL("../../../.env", import.meta.url)));
 } catch {}
 const need = (k: string) => {
   const v = process.env[k];
@@ -43,7 +44,7 @@ const quota = new QuotaClient({
   merkleProof: () => membership.proof(),
   epochLength: Number(process.env.QUOTA_EPOCH_SECONDS || 3600),
   allowOveruse: cheat,
-  usage: new FileUsageStore(new URL("../data/agent-usage.json", import.meta.url).pathname),
+  usage: new FileUsageStore(fileURLToPath(new URL("../data/agent-usage.json", import.meta.url))),
 });
 const membership = new RegistryMembership(chain, registry, quota.leaf);
 

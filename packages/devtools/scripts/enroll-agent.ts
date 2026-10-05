@@ -9,7 +9,8 @@ import { identityCommitment, registryAbi } from "@quota/core";
 import { Broadcaster, LocalKeyWallet } from "@quota/slasher";
 import { enrollWithSoftPasskey } from "../src/index.ts";
 
-process.loadEnvFile?.(new URL("../../../.env", import.meta.url).pathname);
+import { fileURLToPath } from "node:url";
+process.loadEnvFile?.(fileURLToPath(new URL("../../../.env", import.meta.url)));
 const need = (k: string) => {
   const v = process.env[k];
   if (!v) throw new Error(`missing env ${k}`);

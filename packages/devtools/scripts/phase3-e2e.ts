@@ -14,7 +14,8 @@ import { QuotaVerifier, RegistryRootChecker, type Violation } from "@quota/serve
 import { Broadcaster, CommitRevealPath, LocalKeyWallet, Slasher, type SlashOutcome, type Sent } from "@quota/slasher";
 import { Action, SoftPasskey } from "../src/index.ts";
 
-process.loadEnvFile?.(new URL("../../../.env", import.meta.url).pathname);
+import { fileURLToPath } from "node:url";
+process.loadEnvFile?.(fileURLToPath(new URL("../../../.env", import.meta.url)));
 const need = (k: string) => {
   const v = process.env[k];
   if (!v) throw new Error(`missing env ${k}`);

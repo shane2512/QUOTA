@@ -50,6 +50,20 @@ Enrolled with `pnpm --filter @quota/devtools enroll-agent` (scripted operator wi
 | `enroll` (estimate 1,282,562) | `0x10b267dcfbacf2c1efd8dc02fd4d73030da7d49146da69e90383f7960acec004` |
 | Sweep 0.279 MON back to the deployer | `0x894f472125b179f5ff318f7c5855056c06f8130298dc6e6701213173e20576b6` |
 
+## Phase 4 test run: phase3 e2e re-run on testnet (2026-10-05)
+
+Re-run with `pnpm phase3` as part of the Phase 4 full test pass. 14/14 PASS.
+Also fixed: Windows `import.meta.url` path bug (`fileURLToPath`) in devtools and demo-mcp scripts.
+
+| Step | Tx | Notes |
+|---|---|---|
+| Fund operator `0x4093D5e7E88dDdc9531743E7a70604f10b1a8cbC` | `0xaaf8d1fd93cae980d8e6b16afdee2fdb038ffbafcfac9fdea168a28854c66ec7` | estimate 21,000 |
+| `registerPasskey` | `0xceaaa437698012b8d0dc8a6dc766c85ced56123994b85892b949b39f4db32113` | estimate 131,851 |
+| `enroll` (index 3, stake 0.03 MON) | `0xd65a1e18c04a5d59bf6d6b644032f0be1463b5c94af60527a1bb3b7029f577d5` | block 68347530, estimate 1,290,928 |
+| `commitSlash` | `0x57006a5d001b427165ea75e13ab974a810fe00f6c6c3d56b0c6ebcd49017c47b` | block 68347545, estimate 51,914 |
+| `revealSlash` | `0xfee479d1e5cac3771eb46ac1a996f3ed872c45e6fdb93668ede121bb51a83430` | block 68347567 (+22 from commit), receiver `0x05c2bF6F50D3C177C5AAB0Ade971C82F691411C8` +0.015 MON; member Slashed; leaf removed |
+| Sweep back to funder | `0xf05078b0a7db9fa9e922b1602f7edac36b05680b1ec800a146de16b2a5101fe2` | 0.278 MON returned |
+
 ## Gas
 
 - Foundry model, depth 20 enroll (v1): **1,675,321 gas** (not a Monad measurement).

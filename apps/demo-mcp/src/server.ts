@@ -8,6 +8,7 @@
 ///           QUOTA_SLASH=1 + SLASHER_PRIVATE_KEY [+ SLASH_RECEIVER] to slash violators.
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -19,7 +20,7 @@ import { SqliteNullifierStore } from "@quota/server/sqlite";
 import { Broadcaster, CommitRevealPath, LocalKeyWallet, Slasher } from "@quota/slasher";
 
 try {
-  process.loadEnvFile(new URL("../../../.env", import.meta.url).pathname);
+  process.loadEnvFile(fileURLToPath(new URL("../../../.env", import.meta.url)));
 } catch {}
 const need = (k: string) => {
   const v = process.env[k];
@@ -29,7 +30,7 @@ const need = (k: string) => {
 
 const PORT = Number(process.env.PORT || 8787);
 const SERVER_ID = process.env.QUOTA_SERVER_ID || "demo-mcp.quota";
-const DB = process.env.QUOTA_DB || new URL("../data/nullifiers.db", import.meta.url).pathname;
+const DB = process.env.QUOTA_DB || fileURLToPath(new URL("../data/nullifiers.db", import.meta.url));
 const registry = need("QUOTA_REGISTRY_ADDRESS") as Address;
 const chain = createPublicClient({ transport: http(need("MONAD_RPC_URL")) });
 

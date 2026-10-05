@@ -33,7 +33,7 @@ Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An opera
 | 1 Contracts | Done. v2 verified on Sourcify; enroll gas measured on Monad (`eth_estimateGas` 1,299,685) |
 | 2 RLN proofs | Done, including a proof against an on-chain root (closed in the Phase 3 e2e) |
 | 3 Slash (commit–reveal) | Done. On-chain slash with reward on Monad testnet; searcher test in forge. **Independently re-verified 2026-10-05: forge 84/84, pnpm 17/17, typecheck clean, coverage confirmed.** |
-| 4 SDKs, middleware, demo MCP | Done. Express/Hono/MCP middleware, demo MCP server live against v2, quickstarts; clean-checkout quickstart passed (human-stranger timing still open) |
+| 4 SDKs, middleware, demo MCP | Done. Express/Hono/MCP middleware, demo MCP server live against v2, quickstarts; clean-checkout quickstart passed (human-stranger timing still open). **Re-verified 2026-10-05: forge 84/84, pnpm 26/26, typecheck clean, phase3 e2e 14/14 PASS on testnet. Windows path bug (fileURLToPath) found and fixed.** |
 | 5 Wallet integrations | **Next** |
 | 6–8 | Not started |
 
@@ -141,6 +141,7 @@ A separate session re-ran all locally runnable Phase 3 checks from scratch (no c
 - `pnpm test`: **17 passed, 0 failed** (core 9, server 5, slasher 3) ✅
 - `pnpm typecheck`: **clean** across all 4 packages ✅
 - Testnet e2e not re-run: slasher wallet at ~0.016 MON (needs ≥ 0.3 MON). Original PASS evidence stands.
+- Testnet e2e re-run 2026-10-05: **14/14 PASS**. Agent enrolled at index 3, commit block 68347545, reveal block 68347567, receiver +0.015 MON. Txs in `deployments.md`. Slasher well-funded (9.734 MON).
 - **`forge coverage --ir-minimum` artefact:** `test_commit_firstBlockKept` fails only under IR instrumentation (`assertion failed: 1 != 6`) — the Yul IR rewriter changes `block.number` tracking. Passes under `forge test` and standard coverage. Not a functional defect.
 
 **Must fix before the demo (economics):**
@@ -182,6 +183,25 @@ A separate session re-ran all locally runnable Phase 3 checks from scratch (no c
 - Find a named external integrator (owner).
 - Packages are TS source used from the monorepo. Publishing to npm is **not done and needs owner approval** (it's outward-facing).
 
+## 8d. Phase 4 — re-verification (2026-10-05)
+**All tests pass. One Windows bug found and fixed.**
+
+- `pnpm typecheck`: **clean** (6 packages/apps) ✅
+- `forge test`: **84/84 passed** ✅
+- `forge coverage`: `PasskeyAuth` 100.00% lines / 92.31% branches; `QuotaRegistry` 98.83% lines / 80.56% branches ✅
+- `pnpm test`: **26/26 passed** (core 12, client 2, slasher 3, server 9) ✅
+- `pnpm phase3` (Monad testnet): **14/14 PASS** ✅ — commit block 68347545, reveal block 68347567 (+22), receiver `0x05c2bF6F50D3C177C5AAB0Ade971C82F691411C8` +0.015 MON. Txs in `deployments.md`.
+
+**Bug fixed:** `import.meta.url` `.pathname` on Windows returns `/D:/...` (leading slash), producing double-drive paths (`D:\D:\METRO\.env`) with Node's file APIs. Fixed using `fileURLToPath(new URL(..., import.meta.url))` in:
+- `packages/devtools/scripts/phase3-e2e.ts`
+- `packages/devtools/scripts/enroll-agent.ts`
+- `apps/demo-mcp/src/server.ts` (`.env` load + SQLite DB path)
+- `apps/demo-mcp/src/agent.ts` (`.env` load + usage file path)
+
+Only triggered on Windows with tsx. Typecheck clean after fix.
+
+**Post-test balances:** deployer 5.159 MON, slasher 9.734 MON, agent wallet 0 MON.
+
 ## 9. Phase 5 — what to do next (wallet integrations)
 Exit check: the end-to-end flow runs with Privy on the agent side and Dynamic on the service side. No private keys in `.env` except sponsor auth keys.
 1. **`PrivyAgentWallet`** (W1, W2, W4) implementing `WalletAdapter` plus `signMessage`:
@@ -206,10 +226,10 @@ Exit check: the end-to-end flow runs with Privy on the agent side and Dynamic on
 - Someone outside the team to time the service quickstart.
 - Approval before publishing packages to npm (if wanted).
 - Final public domain (needed for the Phase 7 redeploy).
-- Faucet top-up: deployer 0.363 MON, slasher 0.016 MON (a slash needs ~0.28; a redeploy ~0.84).
+- Faucet top-up: deployer **5.159 MON**, slasher **9.734 MON** (well funded; no immediate top-up needed). A redeploy costs ~0.84 MON, a slash ~0.28 MON.
 - Read access for the organizers' account.
 - Community group (or skip).
-- Push approval for the local commits.
+- Push approval for the local commits (includes the Windows fileURLToPath fix).
 - The Vercel deployment `https://quota-metro.vercel.app` shows mock data; do not present it as live results.
 
 ## 11. Working-tree note

@@ -209,3 +209,27 @@ Append-only record of what was done, what was observed, and what is still open. 
   - `FileUsageStore` failed when its directory was missing; it now creates it.
   - pnpm auto-added a `minimumReleaseAgeExclude` for hono 4.13.13. I reverted that, restored the lockfile and pinned 4.13.12.
 - Balances after: deployer 0.363 MON, slasher 0.016 MON.
+
+### 2026-10-05 — Phase 4 complete test run (re-verification, env restored)
+
+Owner provided the correct `.env` (all keys including `SLASHER_PRIVATE_KEY` and `AGENT_PRIVATE_KEY`). Full test suite run from scratch.
+
+**Bug found and fixed: Windows `import.meta.url` path resolution.**
+`.pathname` on a `file:///D:/...` URL returns `/D:/...` (leading slash) not `D:/...`. When Node's `process.loadEnvFile` receives `/D:/METRO/.env` as a path string on Windows, it joins it to the CWD drive root producing `D:\D:\METRO\.env` (ENOENT). Fixed in 4 files by using `fileURLToPath` from `node:url` instead:
+- `packages/devtools/scripts/phase3-e2e.ts`
+- `packages/devtools/scripts/enroll-agent.ts`
+- `apps/demo-mcp/src/server.ts` (also fixes the SQLite DB path)
+- `apps/demo-mcp/src/agent.ts` (also fixes the agent usage file path)
+
+Only triggered on Windows when running scripts directly with `tsx`. Typecheck clean after fix.
+
+**Test results (all PASS):**
+- `pnpm typecheck`: clean (6 packages/apps).
+- `forge test`: **84/84 passed** (9 suites, 84.10 ms). No changes to contracts.
+- `forge coverage`: `PasskeyAuth` 100.00% lines / 92.31% branches; `QuotaRegistry` 98.83% lines / 80.56% branches. `--ir-minimum` still fails `test_commit_firstBlockKept` (IR instrumentation artefact, not a functional defect).
+- `pnpm test`: **26/26 passed** (core 12, client 2, slasher 3, server 9). No changes to tests.
+- `pnpm phase3` (Monad testnet, registry v2): **14/14 PASS**. Agent enrolled at index 3, 3 honest proofs, violation → secret recovery, commit at block 68347545, reveal at block 68347567 (+22 blocks), receiver `0x05c2bF6F50D3C177C5AAB0Ade971C82F691411C8` +0.015 MON. Leaf removed. Second slash rejected. Txs in `deployments.md`.
+
+**Post-test balances:** deployer 5.159 MON, slasher 9.734 MON (heavily funded), agent 0 MON.
+
+**Full test evidence:** `docs/phase4-test-report.md`.
