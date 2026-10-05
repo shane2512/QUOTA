@@ -54,6 +54,43 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  apps/scout:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.32.0
+        version: 1.32.0(zod@4.6.5)
+      '@privy-io/node':
+        specifier: 0.35.0
+        version: 0.35.0(@solana/kit@5.5.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@7.0.2))(viem@2.57.2(typescript@7.0.2)(zod@4.6.5))
+      '@quota/client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      '@quota/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@quota/devtools':
+        specifier: workspace:*
+        version: link:../../packages/devtools
+      '@quota/slasher':
+        specifier: workspace:*
+        version: link:../../packages/slasher
+      '@quota/wallets':
+        specifier: workspace:*
+        version: link:../../packages/wallets
+      viem:
+        specifier: ^2.57.2
+        version: 2.57.2(typescript@7.0.2)(zod@4.6.5)
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.4
+        version: 26.6.4
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
   apps/web:
     dependencies:
       '@fontsource-variable/archivo':

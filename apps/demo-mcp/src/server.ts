@@ -5,6 +5,7 @@
 ///
 /// Env (../../.env, then process env): MONAD_RPC_URL, QUOTA_REGISTRY_ADDRESS
 /// Optional: PORT (8787), QUOTA_SERVER_ID (demo-mcp.quota), QUOTA_EPOCH_SECONDS (3600), QUOTA_DB (data/nullifiers.db),
+///           QUOTA_TOOLSET (search | summary | both; default search): which Wikipedia tools this instance serves.
 ///           QUOTA_SLASH=1 to slash violators, signing with the Dynamic server wallet (DYNAMIC_ENVIRONMENT_ID,
 ///           DYNAMIC_API_TOKEN, DYNAMIC_SLASHER_WALLET, DYNAMIC_WALLET_PASSWORD) or, if those are unset,
 ///           SLASHER_PRIVATE_KEY. Rewards go to SLASH_RECEIVER or the slasher wallet itself.
@@ -93,8 +94,33 @@ async function wikipedia(query: string, limit: number) {
   return titles.map((title, i) => ({ title, url: links[i] }));
 }
 
+async function summary(title: string) {
+  const r = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g, "_"))}`, {
+    headers: { "user-agent": "QUOTA-demo-mcp/0.1 (Monad Metropolis hackathon)" },
+  });
+  if (r.status === 404) return { title, extract: "(no article with that exact title)" };
+  if (!r.ok) throw new Error(`wikipedia ${r.status}`);
+  const d = (await r.json()) as { title: string; extract: string; content_urls?: { desktop?: { page?: string } } };
+  return { title: d.title, extract: d.extract.slice(0, 1200), url: d.content_urls?.desktop?.page };
+}
+
+const TOOLSET = process.env.QUOTA_TOOLSET || "search";
+
 function mcpServer() {
-  const s = new McpServer({ name: "quota-demo-mcp", version: "0.1.0" });
+  const s = new McpServer({ name: `quota-demo-mcp (${SERVER_ID})`, version: "0.1.0" });
+  if (TOOLSET === "summary" || TOOLSET === "both") {
+    s.registerTool(
+      "page_summary",
+      {
+        description: "Get the lead summary of a Wikipedia article by exact title. Rate-limited by QUOTA: attach an RLN proof in _meta['quota/proof'].",
+        inputSchema: { title: z.string().min(1).max(200) },
+      },
+      quotaTool(verifier, "page_summary", async ({ title }: { title: string }) => ({
+        content: [{ type: "text" as const, text: JSON.stringify(await summary(title)) }],
+      })),
+    );
+  }
+  if (TOOLSET === "summary") return s;
   s.registerTool(
     "web_search",
     {
@@ -128,4 +154,4 @@ app.post("/mcp", async (req, res) => {
   await transport.handleRequest(req, res, req.body);
 });
 
-app.listen(PORT, () => console.log(`quota demo-mcp on http://localhost:${PORT}/mcp (server id ${SERVER_ID}, registry ${registry})`));
+app.listen(PORT, () => console.log(`quota demo-mcp on http://localhost:${PORT}/mcp (server id ${SERVER_ID}, toolset ${TOOLSET}, registry ${registry})`));

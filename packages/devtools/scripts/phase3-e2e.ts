@@ -3,7 +3,7 @@
 ///   → 3 honest RLN requests verified against the ON-CHAIN root → 4th request reuses a message id
 ///   → server recovers the secret → slasher commit → reveal → reward lands at the receiver.
 /// Env: MONAD_RPC_URL, QUOTA_REGISTRY_ADDRESS, DEPLOYER_PRIVATE_KEY (funds the actors), SLASHER_PRIVATE_KEY,
-///      WEBAUTHN_RP_ID, PASSKEY_ORIGIN (default http://localhost:3777).
+///      WEBAUTHN_RP_ID, PASSKEY_ORIGIN (default: defaultOrigin(WEBAUTHN_RP_ID)).
 /// Run: pnpm --filter @quota/devtools phase3   (reads ../../.env)
 import { randomBytes } from "node:crypto";
 import { createPublicClient, encodeAbiParameters, encodeFunctionData, formatEther, http, type Address, type Hex } from "viem";
@@ -12,7 +12,7 @@ import { QuotaClient } from "@quota/client";
 import { MemberState, fetchTree, identityCommitment, loadArtifacts, registryAbi } from "@quota/core";
 import { QuotaVerifier, RegistryRootChecker, type Violation } from "@quota/server";
 import { Broadcaster, CommitRevealPath, LocalKeyWallet, Slasher, type SlashOutcome, type Sent } from "@quota/slasher";
-import { Action, SoftPasskey } from "../src/index.ts";
+import { Action, SoftPasskey, defaultOrigin } from "../src/index.ts";
 
 import { fileURLToPath } from "node:url";
 process.loadEnvFile?.(fileURLToPath(new URL("../../../.env", import.meta.url)));
@@ -24,7 +24,7 @@ const need = (k: string) => {
 const RPC = need("MONAD_RPC_URL");
 const REGISTRY = need("QUOTA_REGISTRY_ADDRESS") as Address;
 const RP_ID = need("WEBAUTHN_RP_ID");
-const ORIGIN = process.env.PASSKEY_ORIGIN || "http://localhost:3777";
+const ORIGIN = process.env.PASSKEY_ORIGIN || defaultOrigin(RP_ID);
 const LIMIT = 3n;
 
 const ok = (cond: boolean, label: string) => {

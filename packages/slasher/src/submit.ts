@@ -19,7 +19,14 @@ export interface BroadcasterOptions {
   /// Fixed max fee per gas (overrides the estimate and the floor). Lowers the balance a sender must hold,
   /// since Monad checks limit × max fee + value up front.
   maxFeePerGas?: bigint;
+  /// Monad reserve balance: a value transfer that leaves the sender below RESERVE_WEI reverts at execution unless it
+  /// is the sender's first transaction in the reserve window. Before such a transfer, wait this many blocks after
+  /// the sender's previous transaction (sent through this Broadcaster). Default 4; 0 disables.
+  reserveWindowBlocks?: number;
 }
+
+/// docs.monad.xyz/developer-essentials/reserve-balance (10 MON default reserve).
+export const MONAD_RESERVE_WEI = 10n * 10n ** 18n;
 
 export interface Sent {
   hash: Hex;
@@ -36,8 +43,17 @@ export class Broadcaster {
     private o: BroadcasterOptions = {},
   ) {}
 
+  #lastBlock?: bigint;
+
   async send(to: Address, data: Hex, value = 0n): Promise<Sent> {
     const from = this.wallet.address;
+    const window = BigInt(this.o.reserveWindowBlocks ?? 4);
+    if (value > 0n && window > 0n && this.#lastBlock !== undefined) {
+      const balance = await this.client.getBalance({ address: from });
+      if (balance - value < MONAD_RESERVE_WEI) {
+        while ((await this.client.getBlockNumber()) <= this.#lastBlock + window) await new Promise((r) => setTimeout(r, 400));
+      }
+    }
     const [nonce, chainId, gasEstimate, fees] = await Promise.all([
       this.client.getTransactionCount({ address: from, blockTag: "pending" }),
       this.client.getChainId(),
@@ -61,6 +77,7 @@ export class Broadcaster {
     });
     const hash = await this.client.sendRawTransaction({ serializedTransaction: raw });
     const receipt = await this.client.waitForTransactionReceipt({ hash });
+    this.#lastBlock = receipt.blockNumber;
     if (receipt.status !== "success") throw new Error(`transaction reverted: ${hash}`);
     return { hash, receipt, gasLimit, gasEstimate };
   }

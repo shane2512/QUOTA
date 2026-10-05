@@ -3,13 +3,13 @@
 /// because a registered passkey cannot be replaced, so losing it would lock the operator out.
 ///   pnpm --filter @quota/wallets exec tsx scripts/enroll-privy-agent.ts [--identity n] [--limit n] [--dev]
 import { fileURLToPath } from "node:url";
-import { appendFileSync } from "node:fs";
 import { PrivyClient } from "@privy-io/node";
 import { createPublicClient, formatEther, http, type Address, type Hex } from "viem";
 import { deriveSecret } from "@quota/client";
 import { MemberState, identityCommitment, registryAbi } from "@quota/core";
 import { Broadcaster, LocalKeyWallet } from "@quota/slasher";
-import { SoftPasskey, enrollWithSoftPasskey } from "@quota/devtools";
+import { enrollWithSoftPasskey } from "@quota/devtools";
+import { operatorPasskey } from "./operator-passkey.ts";
 import { PrivyAgentWallet } from "../src/index.ts";
 
 const envPath = fileURLToPath(new URL("../../../.env", import.meta.url));
@@ -28,14 +28,7 @@ const registry = process.env.QUOTA_REGISTRY_ADDRESS as Address;
 const privy = new PrivyClient({ appId: process.env.PRIVY_APP_ID!, appSecret: process.env.PRIVY_APP_SECRET! });
 const wallet = await PrivyAgentWallet.load(privy, process.env[dev ? "PRIVY_DEV_AGENT_WALLET_ID" : "PRIVY_AGENT_WALLET_ID"]!, process.env.PRIVY_AUTH_PRIVATE_KEY!);
 
-const pkVar = dev ? "DEV_OPERATOR_PASSKEY" : "DEMO_OPERATOR_PASSKEY";
-let pk: SoftPasskey;
-if (process.env[pkVar]) pk = new SoftPasskey(process.env.WEBAUTHN_RP_ID!, "http://localhost:3777", process.env[pkVar]);
-else {
-  pk = new SoftPasskey(process.env.WEBAUTHN_RP_ID!, "http://localhost:3777");
-  appendFileSync(envPath, `\n# TEST TOOLING: software passkey standing in for the operator's device (P-256 PKCS8, base64)\n${pkVar}=${pk.exportPkcs8()}\n`);
-  console.log(`created a software operator passkey and saved it as ${pkVar} in .env`);
-}
+const pk = operatorPasskey(envPath, process.env.WEBAUTHN_RP_ID!, dev);
 
 const secret = await deriveSecret((m) => wallet.signMessage(m), identity); // via Privy; never printed
 const id = identityCommitment(secret);
@@ -53,7 +46,7 @@ const r = await enrollWithSoftPasskey({
   limit,
   rpId: process.env.WEBAUTHN_RP_ID!,
   operator: new Broadcaster(client, wallet, fee),
-  operatorBalance: limit * unit + (dev ? 10n ** 18n : 200_000_000_000_000_000n),
+  operatorBalance: limit * unit + (dev ? 10n ** 18n : 450_000_000_000_000_000n), // stake + enroll gas limit × max fee + margin
   passkey: pk,
   log: (l) => console.log(`  ${l}`),
 });

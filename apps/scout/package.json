@@ -1,0 +1,27 @@
+{
+  "name": "@quota/scout",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Scout: an LLM research agent that spends anonymous QUOTA rate limits across MCP servers (PRD D1).",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "@privy-io/node": "0.35.0",
+    "@quota/client": "workspace:*",
+    "@quota/core": "workspace:*",
+    "@quota/devtools": "workspace:*",
+    "@quota/slasher": "workspace:*",
+    "@quota/wallets": "workspace:*",
+    "viem": "^2.57.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

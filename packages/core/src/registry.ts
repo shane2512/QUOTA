@@ -17,6 +17,8 @@ export const registryAbi = parseAbi([
   "function UNIT() view returns (uint256)",
   "function registerPasskey(uint256 x, uint256 y, (bytes authenticatorData, string clientDataJSON, uint256 r, uint256 s) a)",
   "function enroll(uint256 idCommitment, uint64 limit, uint256 treeId, (bytes authenticatorData, string clientDataJSON, uint256 r, uint256 s) a) payable",
+  "function topUp(uint256 idCommitment) payable",
+  "function changeLimit(uint256 idCommitment, uint64 newLimit, uint256[] siblings, uint8[] path, (bytes authenticatorData, string clientDataJSON, uint256 r, uint256 s) a)",
   "function commitSlash(bytes32 commitment)",
   "function revealSlash(uint256 a0, address receiver, bytes32 salt, uint256[] siblings, uint8[] path)",
   "function removeSlashedLeaf(uint256 idCommitment, uint256[] siblings, uint8[] path)",

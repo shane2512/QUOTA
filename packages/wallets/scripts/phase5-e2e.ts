@@ -18,6 +18,7 @@ import { QuotaVerifier, RegistryRootChecker, type Violation } from "@quota/serve
 import { Broadcaster, CommitRevealPath, LocalKeyWallet, Slasher, type Sent } from "@quota/slasher";
 import { enrollWithSoftPasskey } from "@quota/devtools";
 import { DynamicServiceWallet, PrivyAgentWallet } from "../src/index.ts";
+import { operatorPasskey } from "./operator-passkey.ts";
 
 process.loadEnvFile?.(fileURLToPath(new URL("../../../.env", import.meta.url)));
 const dev = process.argv.includes("--dev");
@@ -52,12 +53,13 @@ const privy = new PrivyClient({ appId: need("PRIVY_APP_ID"), appSecret: need("PR
 const agentWallet = await PrivyAgentWallet.load(privy, need(dev ? "PRIVY_DEV_AGENT_WALLET_ID" : "PRIVY_AGENT_WALLET_ID"), need("PRIVY_AUTH_PRIVATE_KEY"));
 const agentTx = new Broadcaster(client, agentWallet, fee);
 console.log(`privy agent wallet ${agentWallet.address}`);
-const secret = await deriveSecret((m) => agentWallet.signMessage(m)); // via Privy; never printed
-const again = await deriveSecret((m) => agentWallet.signMessage(m));
+const IDENTITY = Number(process.env.E2E_IDENTITY || 0);
+const secret = await deriveSecret((m) => agentWallet.signMessage(m), IDENTITY); // via Privy; never printed
+const again = await deriveSecret((m) => agentWallet.signMessage(m), IDENTITY);
 ok(secret === again, "agent secret derived from a Privy signature, stable across calls");
 const id = identityCommitment(secret);
 
-const LIMIT = 3n;
+const LIMIT = BigInt(process.env.E2E_LIMIT || 5); // at UNIT 0.1 MON a 5-message stake (0.5) makes the 50% reward exceed slash gas
 let member = await read<{ state: number; index: number; limit: bigint; stake: bigint }>("members", [id]);
 if (member.state === MemberState.None) {
   const unit = await read<bigint>("UNIT");
@@ -69,7 +71,8 @@ if (member.state === MemberState.None) {
     limit: LIMIT,
     rpId: need("WEBAUTHN_RP_ID"),
     operator: agentTx,
-    operatorBalance: LIMIT * unit + MON(dev ? 1 : 0.2),
+    passkey: operatorPasskey(fileURLToPath(new URL("../../../.env", import.meta.url)), need("WEBAUTHN_RP_ID"), dev),
+    operatorBalance: LIMIT * unit + MON(dev ? 1 : 0.45), // stake + gas limit × max fee (enroll ~2.3M × 120 gwei ≈ 0.28) + margin
     log: (l) => console.log(`  ${l}`),
   });
   for (const t of r.txs) note(t.label, t.sent);
@@ -135,6 +138,7 @@ if (slasher && dynamic) {
     const reward = (member.stake * share) / 10_000n;
     const fees = o.result.commit.receipt.gasUsed * o.result.commit.receipt.effectiveGasPrice + o.result.reveal.receipt.gasUsed * o.result.reveal.receipt.effectiveGasPrice;
     ok(after - before + fees === reward, `Dynamic wallet received ${formatEther(reward)} (balance change ${formatEther(after - before)} after ${formatEther(fees)} gas)`);
+    console.log(`slasher net: reward ${formatEther(reward)} − gas ${formatEther(fees)} = ${formatEther(reward - fees)} MON (${reward > fees ? "profitable" : "LOSS"})`);
     const m2 = await read<{ state: number }>("members", [id]);
     ok(m2.state === MemberState.Slashed, "member Slashed; commit and reveal signed by Dynamic, broadcast by us");
   }

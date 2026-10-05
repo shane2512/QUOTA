@@ -5,7 +5,7 @@ import { encodeAbiParameters, encodeFunctionData, formatEther, type Address, typ
 import { generatePrivateKey } from "viem/accounts";
 import { MemberState, registryAbi } from "@quota/core";
 import { Broadcaster, LocalKeyWallet, type Sent } from "@quota/slasher";
-import { Action, SoftPasskey } from "./soft-passkey.ts";
+import { Action, SoftPasskey, defaultOrigin } from "./soft-passkey.ts";
 
 export interface EnrollOptions {
   client: PublicClient;
@@ -14,7 +14,7 @@ export interface EnrollOptions {
   idCommitment: bigint;
   limit: bigint;
   rpId: string;
-  origin?: string; // default http://localhost:3777 (allowed by the dev registry)
+  origin?: string; // default: defaultOrigin(rpId)
   gasBudget?: bigint; // operator gas money, default 0.45 MON (balance check uses limit × max fee)
   log?: (line: string) => void;
   /// Use this wallet as the operator (e.g. a Privy agent wallet) instead of a fresh throwaway key. It is funded only
@@ -55,7 +55,7 @@ export async function enrollWithSoftPasskey(o: EnrollOptions): Promise<EnrollRes
     while ((await o.client.getBlockNumber()) < funded.receipt.blockNumber + 4n) await new Promise((r) => setTimeout(r, 400));
   }
   try {
-    const pk = o.passkey ?? new SoftPasskey(o.rpId, o.origin ?? "http://localhost:3777");
+    const pk = o.passkey ?? new SoftPasskey(o.rpId, o.origin ?? defaultOrigin(o.rpId));
     const [px, py] = (await read<[bigint, bigint]>("passkeys", [opWallet.address])) as unknown as [bigint, bigint];
     const registered = px !== 0n;
     if (registered && (px !== pk.x || py !== pk.y)) throw new Error("operator has a different passkey registered (pass the matching `passkey`)");

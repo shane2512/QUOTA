@@ -19,6 +19,11 @@ export interface Assertion {
 const sha256 = (b: Buffer | Uint8Array) => createHash("sha256").update(b).digest();
 const b64urlToBig = (s: string) => BigInt(`0x${Buffer.from(s, "base64url").toString("hex")}`);
 
+/// Origin a browser would use for this rpId: http://localhost:3777 (the dev passkey tool) for localhost, else https://<rpId>.
+export function defaultOrigin(rpId: string): string {
+  return rpId === "localhost" ? "http://localhost:3777" : `https://${rpId}`;
+}
+
 export class SoftPasskey {
   readonly x: bigint;
   readonly y: bigint;

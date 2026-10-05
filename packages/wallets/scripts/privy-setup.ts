@@ -28,7 +28,7 @@ const r = await createAgentWallet(privy, {
   signerQuorumId: process.env.PRIVY_AUTH_KEY_QUORUM_ID!,
   registry,
   chainId,
-  valueCapWei: 100_000_000_000_000_000n, // 0.1 MON: stake for up to 10 messages/epoch at UNIT 0.01
+  valueCapWei: BigInt(process.env.PRIVY_VALUE_CAP_WEI || "100000000000000000"), // 0.1 MON: stake for up to 10 messages/epoch at UNIT 0.01
   label: dev ? "QUOTA dev" : "QUOTA",
 });
 console.log(JSON.stringify({ ...r, registry, chainId }, null, 2));
