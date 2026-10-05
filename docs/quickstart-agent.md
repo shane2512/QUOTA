@@ -16,6 +16,7 @@ const r = await mcp.callTool({ name, arguments: args, _meta: await quotaToolMeta
 - `deriveSecret` signs the fixed message `QUOTA/rln-secret/v1`. The secret is recoverable from the wallet and never stored. This needs deterministic signatures; viem local accounts and Privy (`gates.md` G2) qualify.
 - `limit` is your per-epoch allowance per service. It is fixed at enrollment and costs `limit × UNIT` stake (UNIT is 0.01 MON on the dev registry).
 - **Always use a persistent `usage` store.** An agent that restarts and forgets its count would reuse a message id, which reveals its secret and gets it slashed.
+- **With a Privy server wallet** (recommended for autonomous agents): `deriveSecret((m) => privyWallet.signMessage(m), n)` with `PrivyAgentWallet` from `@quota/wallets`. The operator owns the wallet; your runtime key is limited by policy to registry calls and the secret message (`packages/wallets/scripts/privy-setup.ts`). Use `n` to rotate to a fresh identity after a slash.
 - When you are out of quota, `prove` throws `QuotaExhausted` instead of cheating. Wait for the next epoch, use another service, or stake more.
 
 ## 2. Try the demo end to end (repo checkout)

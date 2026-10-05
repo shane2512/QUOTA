@@ -107,6 +107,14 @@ SLASHER_PRIVATE_KEY=           # throwaway testnet signer for the slasher (Local
 AGENT_PRIVATE_KEY=             # demo agent wallet; its RLN secret is derived from a signature (Phase 4)
 AGENT_LIMIT=5                  # per-epoch limit used by devtools enroll-agent
 
+# --- Phase 5: provider wallets (ids/metadata are not secrets; the password is) ---
+PRIVY_AGENT_USER_ID=           # operator's Privy user (owner of the agent wallet)
+PRIVY_AGENT_POLICY_ID=         # override policy for our authorization key
+PRIVY_AGENT_WALLET_ID=         # agent wallet; when set, the demo agent signs with Privy
+DYNAMIC_SLASHER_WALLET=        # base64 walletMetadata of the Dynamic server wallet (no key material)
+DYNAMIC_WALLET_PASSWORD=       # encrypts that wallet's key share backed up at Dynamic; treat as a secret
+DEMO_OPERATOR_PASSKEY=         # TEST TOOLING: software P-256 passkey standing in for the operator's device
+
 # --- Privy (agent side) ---
 PRIVY_APP_ID=
 PRIVY_APP_SECRET=

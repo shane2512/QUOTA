@@ -65,12 +65,15 @@ Goal: kill unknowns before writing real code.
 - Total wall-clock time: 2m 27s (well under the 10-minute threshold).
 
 ## Phase 5 — Wallet integrations (7–9 Oct)
-- [ ] **Privy:** operator login, server wallet with owner = operator user, runtime key as additional signer with override policies, secret derivation from signature, sign-only.
-- [ ] **Dynamic:** server-wallet slasher on Linux (delegated access only if a webhook is proven); service login/embedded wallet for rewards.
-- [ ] Both through `wallets` adapters. Contract and SDK code must not depend on either provider.
-- [ ] Negative test: policy blocks a transaction to any contract other than the registry.
+- [x] **Privy:** server wallet with owner = operator's Privy user (created server-side), runtime key as additional signer with an override policy, secret derived from a Privy signature, sign-only. Interactive operator *login* (console) is Phase 7.
+- [x] **Dynamic:** server-wallet slasher (macOS; key share backed up to Dynamic, no local share). Rewards land in that wallet. Delegated access / embedded-wallet login not done (webhook unproven).
+- [x] Both through `@quota/wallets` adapters (`PrivyAgentWallet`, `DynamicServiceWallet`). Contracts and SDK core import neither provider.
+- [x] Negative tests: policy rejects other contracts, a value over the cap, another chain and other messages (live, `privy-policy-check.ts`, 10/10).
+- [x] Identity rotation: `deriveSecret(sign, n)` signs `QUOTA/rln-secret/v1/n` (n > 0), since a slashed identity can never re-enroll.
 
 **Exit:** the end-to-end flow runs with Privy on the agent side and Dynamic on the service side, no private keys in `.env` except sponsor auth keys.
+- **Flow: PASSED 2026-10-05 on Monad testnet.** It ran both via `phase5-e2e.ts` and through the demo MCP server (the Privy agent cheats, the server's Dynamic slasher slashes).
+- **Key rule: partially met.** The demo agent and slasher now use no local keys. But `.env` still holds `DEPLOYER_PRIVATE_KEY` (deploying and funding test wallets), the test-only `DEMO_OPERATOR_PASSKEY`, and the old `AGENT_PRIVATE_KEY` / `SLASHER_PRIVATE_KEY`. The old ones are fallbacks, unused when the Privy/Dynamic ids are set.
 
 ## Phase 6 — Trust tiers (8–10 Oct) — conditional
 - [ ] **Nansen Screener:** profile a new operator wallet (labels, related wallets, funding, counterparties), sign attestation, Screened tree accepts it; recidivism rule against slashed wallets.

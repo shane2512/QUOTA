@@ -9,8 +9,8 @@ Verified = read in the sponsor's docs this session. Unverified items are gated i
 | # | Bounty | Prize | Verdict | Role in QUOTA | Confidence |
 |---|---|---|---|---|---|
 | 0 | **Track 4: Trust, Identity & AI Infra** | $10k ×3 | **Core** | The whole project | High |
-| 6 | **Privy** | $5k | **Core** | Agent-side wallet infrastructure + policy engine + secret derivation | High |
-| 1 | **Dynamic** | $5k | **Core (server-wallet; delegated access unproven)** | Service-side wallets: autonomous slasher + reward custody via delegated access | Medium |
+| 6 | **Privy** | $5k | **Core** | Agent-side wallet infrastructure + policy engine + secret derivation. Live on Monad (Phase 5): user-owned server wallet, our key as an additional signer under an override policy (10/10 live policy checks), operator for enroll, RLN secret from a Privy signature | High |
+| 1 | **Dynamic** | $5k | **Core (server wallet live on Monad; delegated access unproven)** | Service-side wallet: the slasher signs commit/reveal with a Dynamic server wallet (share backed up to Dynamic) and receives rewards. Slashed a cheating agent on Monad testnet (Phase 5) | Medium–High |
 | 5 | **Alibaba Qwen 3.8 Max** | $5k credits | **DEFERRED: not free, decide before Phase 7** | The autonomous agent that spends quota; article required | Medium |
 | 4 | **Nansen** | $5k pool | **Conditional → Phase 6** | Powers the opt-in "Screened" tree (sybil/recidivism screening of stakers) | Low–Medium |
 | 3 | **Cleanverse CVI/CVA** | $2k | **DROPPED: Phase 0 gate failed (gates.md G4)** | "Compliant" tree: stake held as CVA, moves only between CVI-verified wallets | Unknown (docs gated) |

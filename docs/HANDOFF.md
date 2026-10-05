@@ -1,6 +1,6 @@
 # QUOTA — Handoff for the next engineer / agent
 
-You are continuing a hackathon build (Monad Metropolis, Track 4). Deadline **14 Oct 2026, 09:29 IST**; submit by the evening of 13 Oct. Repo: `github.com/shane2512/QUOTA`. Phases 0–4 are done (Phase 3 independently re-verified 2026-10-05, §8b). **Start at Phase 5** (§9). Read §8 first: the slash works on-chain but is not yet economical at demo stake sizes. §8c covers what Phase 4 added (middleware, demo MCP server, quickstarts).
+You are continuing a hackathon build (Monad Metropolis, Track 4). Deadline **14 Oct 2026, 09:29 IST**; submit by the evening of 13 Oct. Repo: `github.com/shane2512/QUOTA`. Phases 0–5 are done (Phase 3 independently re-verified 2026-10-05, §8b). **Start at Phase 6** (§9). Read §8 first: the slash works on-chain but is not yet economical at demo stake sizes. §8c–8e cover Phase 4 (middleware, demo MCP server, quickstarts, re-verification) and §8f Phase 5 (Privy agent wallet, Dynamic slasher).
 
 ## 1. What QUOTA is (one paragraph)
 Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An operator locks a stake (approved by a human passkey, verified on-chain via the P256 precompile at `0x100`); the agent joins a Merkle tree. Each request carries an RLN-v2 zero-knowledge proof of "I am a member and this is request k of my N this epoch". Reusing a request number leaks the agent's secret `a0` (Shamir two-point recovery); anyone with `a0` can slash the stake. No issuer. The primary output is a primitive (contracts, SDKs, middleware), not a consumer app.
@@ -34,8 +34,9 @@ Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An opera
 | 2 RLN proofs | Done, including a proof against an on-chain root (closed in the Phase 3 e2e) |
 | 3 Slash (commit–reveal) | Done. On-chain slash with reward on Monad testnet; searcher test in forge. **Independently re-verified 2026-10-05: forge 84/84, pnpm 17/17, typecheck clean, coverage confirmed.** |
 | 4 SDKs, middleware, demo MCP | Done. Express/Hono/MCP middleware, demo MCP server live against v2, quickstarts; quickstart timing verified in 2m 27s (target ≤ 10m). **Re-verified 2026-10-05: forge 84/84, pnpm 26/26, typecheck clean, phase3 e2e 14/14 PASS on testnet. MCP live demo: 5 × OK + 1 × REJECTED (violation 429) + server-initiated on-chain slash. Windows path bug (fileURLToPath) found and fixed. Active demo agent index 5.** |
-| 5 Wallet integrations | **Next** |
-| 6–8 | Not started |
+| 5 Wallet integrations | Done. Privy agent wallet (owner + policy + additional signer) and Dynamic slasher, live on Monad incl. a slash through the demo MCP server |
+| 6 Trust tiers (Nansen) | **Next** (conditional; cut first) |
+| 7–8 | Not started |
 
 ### Scope decisions already taken
 - **BTX does not exist for us** (organizers confirmed). Slash path is **commit–reveal only**; label it as the fallback, never as BTX.
@@ -61,7 +62,10 @@ packages/server/                   @quota/server: QuotaVerifier, MemoryNullifier
                                    quotaExpress, quotaHono, quotaTool (MCP); @quota/server/sqlite: SqliteNullifierStore
 packages/slasher/                  @quota/slasher: WalletAdapter, LocalKeyWallet, Broadcaster, CommitRevealPath, Slasher
 packages/server/scripts/phase2-exit.ts   Phase 2 exit check (`pnpm phase2`, runs against v1)
-packages/devtools/                 @quota/devtools, TEST TOOLING ONLY: SoftPasskey, enrollWithSoftPasskey,
+packages/wallets/                  @quota/wallets: PrivyAgentWallet, agentPolicyRules/createAgentWallet/updateAgentPolicy,
+                                   DynamicServiceWallet (+ dynamic-sdk.ts type shim). scripts/: privy-setup, privy-policy-check,
+                                   privy-update-policy, enroll-privy-agent, dynamic-create-wallet, probe*, phase5-e2e
+packages/devtools/                 @quota/devtools, TEST TOOLING ONLY: SoftPasskey (persistable), enrollWithSoftPasskey,
                                    scripts/enroll-agent.ts (`pnpm --filter @quota/devtools enroll-agent`),
                                    scripts/phase3-e2e.ts (`pnpm phase3`, uses .env)
 apps/demo-mcp/                     reference MCP server (web_search over live Wikipedia) + REST twin + demo agent
@@ -99,6 +103,20 @@ Deployed on Monad testnet (chain 10143):
 - Measured on an Apple M2 (node 26): proving median 1170 ms in one run and 705 ms in another (n=10 each); verify median 16–32 ms. Windows and browser not measured.
 
 ## 6. Gotchas that already cost time
+- **Stopping the demo server:** use `pkill -f "src/server.ts"` and then check `ps`/`lsof -iTCP:8787`. The real command line is `…/tsx/dist/cli.mjs src/server.ts`, so `pkill -f "tsx src/server.ts"` matches nothing. A stray server from Phase 4 answered requests in Phase 5, and a cheat went undetected.
+- **Dynamic:**
+  - Save the full `walletMetadata` at creation (`DYNAMIC_SLASHER_WALLET`). Without `externalServerKeySharesBackupInfo` a wallet cannot sign, which is why the Phase 0 wallet is unusable.
+  - Backing up to Dynamic requires a password (`DYNAMIC_WALLET_PASSWORD`).
+  - `getWallets()` returns 404 with API-token auth; use `getWalletByAddress`.
+  - Signing is intermittently slow (timeouts after 300 s / ~99 s); the adapter retries 3×.
+  - Its `.d.ts` cannot be resolved under NodeNext, hence `packages/wallets/src/dynamic-sdk.ts`.
+- **Privy:**
+  - Policy rule names must be < 50 characters.
+  - Creating a user by an email that already exists fails; `createAgentWallet` reuses the user by email.
+  - Policies are default-deny.
+  - Our key is an additional signer under an *override* policy; the operator user (owner) is not restricted.
+- **A registered passkey can't be replaced.** Persist the software operator passkey (`DEMO_OPERATOR_PASSKEY`) or the operator is locked out; the first Privy wallet was lost this way.
+- **A slashed identity can never re-enroll:** use the next `--identity n` (`deriveSecret(sign, n)`).
 - **Foundry only exposes the P256 precompile under `evm_version = "osaka"`** (set in `contracts/foundry.toml`). Under `prague` the call returns empty and valid signatures fail. `PasskeyAuth` fails closed when the precompile is missing.
 - **Monad bills the gas limit**, not gas used. Receipts show your limit as `gasUsed`. Use `eth_estimateGas` (the `Broadcaster` sends estimate × 1.15). Monad rejected a 10 gwei max fee; gas price is ~102 gwei, so scripts use a max-fee floor of 200 gwei. The sender's balance must cover limit × max fee + value, even though only limit × effective price is charged.
 - **Monad executes asynchronously; this cost two failed runs and ~0.43 MON:**
@@ -124,7 +142,7 @@ Deployed on Monad testnet (chain 10143):
 ## 7. Setup on a new machine
 1. Node ≥ 20, pnpm ≥ 9, Foundry (`foundryup`; 1.8.4 used). Git with submodules: `git clone --recurse-submodules` (or `git submodule update --init --recursive`).
 2. `cd contracts && forge test` — expect 84 passed.
-3. `pnpm install && pnpm typecheck && pnpm test` — expect core 12, client 2, server 9, slasher 3 passed (~40 s, real proofs). `pnpm phase2` re-runs the Phase 2 check against v1 (~4 min, event scan).
+3. `pnpm install && pnpm typecheck && pnpm test` — expect core 12, client 3, server 9, slasher 3, wallets 3 passed (~40 s, real proofs). `pnpm phase2` re-runs the Phase 2 check against v1 (~4 min, event scan).
 4. Copy `.env.example` to `.env` (gitignored). **Do not ask for or reuse the previous owner's keys.** Generate your own throwaway deployer and slasher keys, fund them at `https://faucet.monad.xyz`, and add sponsor keys only for accounts you own. Required env names are in `docs/02-requirements-env.md` §5 (now includes `SLASHER_PRIVATE_KEY`).
 5. Public testnet RPC: `https://testnet-rpc.monad.xyz`, chain id 10143.
 6. `pnpm phase3` (= `pnpm --filter @quota/devtools phase3`) re-runs the slash e2e. It spends about 0.15 MON operator gas (mostly swept back), 0.03 stake, and ~0.28 MON slasher gas. The slasher needs ≥ 0.3 MON.
@@ -177,10 +195,9 @@ A separate session re-ran all locally runnable Phase 3 checks from scratch (no c
 - `pnpm test` 26 passed, using real proofs through real Express 5, Hono and MCP SDK 1.32. `forge test` 84. Typecheck clean.
 - Anvil rehearsal of the whole loop, including `--cheat` → violation → on-chain commit–reveal slash from the server.
 - Monad v2 with the demo agent (index 2, limit 5): 5 accepted calls with live Wikipedia results across two agent runs (the count persisted), then `STOP` at the 6th. Slashing was off because the slasher can't pay gas.
-- Clean-checkout quickstart: 401 → 200 in 28 s of machine time, with files taken verbatim from the doc. **Not yet timed with a human.**
+- Clean-checkout quickstart: 401 → 200 in 28 s of machine time (agent run). A human run on Windows took 2m 27s (§8d, `phase4-test-report.md`).
 
 **Remaining for Phase 4's intent:**
-- Have a person outside the team run `docs/quickstart-service.md` and record the time.
 - Find a named external integrator (owner).
 - Packages are TS source used from the monorepo. Publishing to npm is **not done and needs owner approval** (it's outward-facing).
 
@@ -249,30 +266,53 @@ STOP  "overflow query": quota exhausted for this epoch (client refuses to reuse 
 
 **Post-test balances:** deployer 4.933 MON, slasher 9.228 MON.
 
-## 9. Phase 5 — what to do next (wallet integrations)
-Exit check: the end-to-end flow runs with Privy on the agent side and Dynamic on the service side. No private keys in `.env` except sponsor auth keys.
-1. **`PrivyAgentWallet`** (W1, W2, W4) implementing `WalletAdapter` plus `signMessage`:
-   - A server wallet owned by the operator's Privy user, with our runtime authorization key as an additional signer (`PRIVY_AUTH_PRIVATE_KEY`, `PRIVY_AUTH_KEY_QUORUM_ID`).
-   - Override policy: allowlist QuotaRegistry only, plus a value cap.
-   - Sign-only (`eth_signTransaction`, then broadcast via `Broadcaster`).
-   - The agent secret is `deriveSecret((m) => privy.personal_sign(m))`. Determinism was verified 3/3 in G2, on a wallet without owner or policy; re-check it with the owner/policy setup.
-2. **Negative test:** the policy rejects a transaction to any other contract, and a value above the cap.
-3. **`DynamicServiceWallet`** (W3) implementing `WalletAdapter` for the slasher, via the `@dynamic-labs-wallet/node-evm` server wallet (G3 PASS; macOS/Linux only).
-   - Delegated access stays unclaimed unless a webhook is actually received.
-   - Rewards land at the service operator's Dynamic wallet (`SLASH_RECEIVER`).
-4. Wire both into `apps/demo-mcp`:
-   - The agent signs with Privy (replaces `AGENT_PRIVATE_KEY`).
-   - The server slashes with Dynamic (replaces `SLASHER_PRIVATE_KEY`).
-   - Contracts and the SDK core must not import either provider; the adapters live in `packages/wallets` (layout §6).
-5. **Before any live slash:** top up the slashing wallet (≥ 0.3 MON) and fix slash economics (§8), or demonstrate on anvil.
+## 8f. Phase 5 — done (wallet integrations, 2026-10-05)
+**Agent side (Privy):**
+- Wallet `0x1Ec0d0992990008Bcf1555FFd809Ca78aE651aA6` (`PRIVY_AGENT_WALLET_ID`) is owned by the operator's Privy user.
+- Our key quorum is an additional signer under an override policy. That policy allows only registry transactions on chain 10143 with value ≤ 0.1 MON, and personal_sign of `QUOTA/rln-secret/v1…`.
+- The Privy wallet is the operator: it registers the (software) passkey and enrolls. The agent's secret is `deriveSecret(privy.signMessage, n)`.
+
+**Service side (Dynamic):**
+- Server wallet `0x7d150c30971cb7aE8Bf5e9Ce6deb79a12D92Aee1`. Its share is backed up to Dynamic; we keep only the metadata and the password.
+- It signs commit and reveal, and receives the reward.
+- Delegated access was **not** done.
+
+**Evidence** (txs in `deployments.md`):
+- `phase5-e2e` passes on Monad: Privy enroll → proofs → cheat → Dynamic slash, with the reward received.
+- The demo MCP server with `QUOTA_SLASH=1` slashed a cheating Privy agent (identity 1, index 8) on-chain via Dynamic.
+- Live Privy policy check: 10/10.
+- 30 package tests, forge 84.
+
+**Exit-check caveat:**
+- The demo flow uses no local agent or slasher keys.
+- `.env` still holds `DEPLOYER_PRIVATE_KEY` (deploying and funding test wallets), the test-only `DEMO_OPERATOR_PASSKEY`, and the now-unused fallbacks `AGENT_PRIVATE_KEY` / `SLASHER_PRIVATE_KEY`.
+
+**Demo usage:**
+```bash
+QUOTA_SLASH=1 QUOTA_MAX_FEE_GWEI=120 pnpm --filter @quota/demo-mcp start      # Dynamic slasher
+pnpm --filter @quota/wallets exec tsx scripts/enroll-privy-agent.ts --identity 2 --limit 3
+pnpm --filter @quota/demo-mcp agent --identity 2 "q1" "q2" "q3"          # Privy agent; then add --cheat
+```
+Identities already used: 0 (index 7, Active, limit 5) and 1 (index 8, Slashed). Use 2 or higher for new runs.
+
+## 9. Phase 6 — what to do next (Nansen "Screened" tree, conditional)
+Exit check: a screened enrollment succeeds for a clean wallet and is refused for a wallet related to a slashed one. If this isn't working by 10 Oct, cut it.
+1. **Credits first.** `related-wallets`/`counterparties` returned `insufficient_credits` in G5. Without them T2 (recidivism) can't be built honestly. Confirm credits with the owner before writing code. If there are none, propose labels plus our own funding-source trace from chain data, or cut.
+2. Contracts (PRD C8, T1):
+   - `treeId` 1 = Screened. Enrollment needs an attestor's signature over `(chainId, registry, operator, idCommitment, expiry)`; the registry lists accepted attestor keys.
+   - This needs a registry redeploy. **Combine it with the Phase 7 redeploy** (public rpId/origins, slash economics: one Merkle pass in reveal, a bigger UNIT).
+   - Every Privy policy must then be updated with `privy-update-policy.ts` (the policies pin the registry address).
+3. `packages/screener`: Nansen Profiler (labels, related wallets, funding source, counterparties) → a decision → signed attestation. Recidivism: related to a slashed operator → refuse, or require 2× stake (T2). Anyone can run a screener.
+4. A "remove it and it breaks" test: the Screened tree fails closed without an attestation.
 
 ## 10. Open items needing the owner
 - Qwen decision.
 - Nansen credits.
 - **A named external integrator (Phase 4 item, deferred by owner).**
+- Nansen credits (decides Phase 6).
 - Approval before publishing packages to npm (if wanted).
 - Final public domain (needed for the Phase 7 redeploy).
-- Faucet top-up: deployer **5.159 MON**, slasher **9.734 MON** (well funded; no immediate top-up needed). A redeploy costs ~0.84 MON, a slash ~0.28 MON.
+- Balances (after Phase 5): deployer 3.371 MON, Dynamic slasher 0.129 (top up to ≥ 0.33 before the next slash), Privy agent wallet 0.048, old local-key slasher 9.228 (unused by the demo now; can fund the others).
 - Read access for the organizers' account.
 - Community group (or skip).
 - Push approval for the local commits (includes the Windows fileURLToPath fix).

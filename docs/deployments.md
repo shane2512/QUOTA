@@ -101,6 +101,45 @@ Fresh agent (`AGENT_PRIVATE_KEY=0x4931...`), idCommitment `154778754656635484003
 | `enroll` (index 5, stake 0.05) | `0x74261dd7023b62501f87a3e3f241943e0aca5a11f1f310a5cf5f1e3fe1545438` |
 | `sweep` | `0x85d8dfc3ba916b1c33477205daf83c00af16d443950dbacd796dc340ca0ea863` |
 
+## Phase 5: provider wallets (registry v2, 2026-10-05)
+
+**Wallets.**
+
+| Role | Address | Ids |
+|---|---|---|
+| Privy agent wallet (current, Monad) | `0x1Ec0d0992990008Bcf1555FFd809Ca78aE651aA6` | wallet `h9cwfdpmtvbiyr3sgwtt968g`, policy `cmubtk1vfo8pdrjjfbnmizpw` |
+| Privy agent wallet (superseded, Monad) | `0x0cc23b3e7e89981Fcaf84E65972c621E76b74920` | wallet `ay2e0f6l46hkoxk75aj4v6xa`, policy `r9239h0nsnmdifpa9o26ue7m` |
+| Privy agent wallet (anvil dev) | `0x8F87203cE9d60d7d9063aF7E22250102b73f2576` | wallet `dnhiwpo4lo0iaergbn2c44k5`, policy `g1vpo6d1snn4hxwu1r2vif45` |
+| Dynamic slasher wallet | `0x7d150c30971cb7aE8Bf5e9Ce6deb79a12D92Aee1` | TWO_OF_TWO; share backed up to Dynamic |
+
+- The superseded Privy wallet is the one used in the e2e below. Its software passkey existed only in memory, so it cannot approve another enroll.
+- Every Privy agent wallet is owned by its operator user, with key quorum `cvlhfa0w46j966r07ahobnok` as an additional signer under the policy.
+
+**1. `phase5-e2e.ts` on Monad (superseded Privy wallet, then the Dynamic slasher):** agent index 6 (limit 3), slashed.
+
+| Step | Tx |
+|---|---|
+| Fund Privy wallet (0.23) | `0xdca1c3d1b699223cd11ba30a555f06bd2dcfd3281cd81ccb111c34ae0d22d05a` |
+| `registerPasskey` (signed by Privy) | `0x9c7f6e3de72331cae6ef3d6160db9c608d7f862265d9246d697e177524932d1a` |
+| `enroll` (signed by Privy, estimate 1,290,940) | `0xe20682f03153142ce9ce24289f3adfcab695a3c1b5ca2a89d5e8bc64bec8c724` |
+| Fund Dynamic wallet | `0x7894993e5ed01059c139977ba9b7d86754342f9e6ef65671d03b69f0b9acfb03` |
+| `commitSlash` (signed by Dynamic) | `0xd5a1fc652822790706b307b147e483347da93931ae0525349f860ed1d8e8caec` |
+| `revealSlash` (signed by Dynamic, estimate 2,316,921) | `0xce975962327ee577a8ffc1895a679fd7bf558cca7454c879a9d29ff34ab4d5b6` |
+
+Reward 0.015 MON to the Dynamic wallet. Its gas for commit + reveal was 0.278 MON at 120 gwei (billed on limits).
+
+**2. Demo MCP server + Privy agent (current Privy wallet), slashed by the server's Dynamic slasher.**
+- Identity 0: index 7, limit 5, **still Active**.
+  - Fund `0x60cc2ffb19e42405f5af286af3228c8d141e236570e0bddaa2becd934a765537`.
+  - `registerPasskey` `0xb9e105f2417f34b34e2a858de6f65060dfce5d07bd4eaa469c2055f8a1ac4bba`.
+  - `enroll` `0x748a635ae2c4a4ae5f8b73d8403de050822797b7263a2131917b46c214aaf281`.
+- Identity 1 (`QUOTA/rln-secret/v1/1`): index 8, limit 2.
+  - Fund `0x2d3462fb9e7325316967f7487800942227e56e4d4c6aad2afa1cdb1ec0f90372`.
+  - `enroll` `0x8121e405175a81e20101814987da20502ca32860bbbd8c4553888952584bc4da` (passkey reused, no re-registration).
+  - 2 honest MCP calls, then a cheat → violation → slashed by the server: commit `0x7372a84d6166d2df232504898415cf424e0a7498002a6fc3204b65cc95af7381`, reveal `0x293a72e61a7d50fd5f357c784fe2a2f1a786546e6da8c48ceab1da136112381d` (sent from `0x7d15…Aee1`). Member state 4 (Slashed).
+- Dynamic top-up before the demo: `0x0fbf9411994980e5f9f2ae83c4f5124f4545df2fd4d2419de949060c653a4407` (0.3 MON).
+- Leaves 3–5 of v2 come from the Phase 4 re-verification runs (sections above).
+
 ## Gas
 
 - Foundry model, depth 20 enroll (v1): **1,675,321 gas** (not a Monad measurement).

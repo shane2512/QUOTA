@@ -11,7 +11,7 @@ Append-only record of what was done, what was observed, and what is still open. 
 | 2 RLN proofs | Done (on-chain root proof closed in Phase 3 e2e) | `pnpm phase2` all PASS |
 | 3 Slash (commit–reveal) | Done | `pnpm --filter @quota/slasher phase3` all PASS on Monad testnet; forge 84 passed |
 | 4 SDKs, middleware, demo MCP | Done (named integrator deferred by owner) | quickstart 401 → 200 in 2m 27s (target ≤ 10m); 26 unit tests + forge 84 green |
-| 5 Wallet integrations | Not started | |
+| 5 Wallet integrations | Done. Privy agent + Dynamic slasher on Monad; key rule partially met (see 03-phases) | Monad e2e all PASS; demo MCP Privy cheat → Dynamic slash on-chain; Privy policy 10/10 live; 30 package tests + forge 84 |
 | 6 Trust tiers (Nansen only) | Not started | |
 | 7 Scout agent, consoles, deploy | Not started | |
 | 8 Hardening and submission | Not started | |
@@ -75,6 +75,15 @@ Append-only record of what was done, what was observed, and what is still open. 
 | Request binding: `x = hashToField(keccak256("QUOTA/http/v1\nMETHOD\npath?query\nbody"))`, JSON bodies canonicalised (sorted keys); MCP: `"QUOTA/mcp-tool/v1\ntool\ncanonical(args)"` | One definition in `@quota/core` so client and server cannot drift; domain-separated so an HTTP proof is never a valid MCP proof |
 | MCP proof travels in `params._meta["quota/proof"]` | Transport-agnostic (stdio, Streamable HTTP); the SDK passes it to handlers as `extra._meta` |
 | Rejections: 401 (missing/invalid/unknown root/bad payload/epoch), 409 replay, 429 violation; MCP returns a tool error with the same reason | Distinguishes "not allowed" from "over quota" |
+| Privy agent wallet: owner = the operator's Privy user (created server-side by email); our key quorum is an *additional signer* with an override policy; no base policy | The operator keeps full control; only our runtime key is restricted |
+| Privy policy: `eth_signTransaction` to = registry ∧ chain_id ∧ value ≤ 0.1 MON; `personal_sign` content starts_with `QUOTA/rln-secret/v1` | Boxes in a hijacked runtime key. `starts_with` (not `eq`) allows identity rotation; the cost is that any message with that prefix can be signed |
+| Identity rotation: `deriveSecret(sign, n)` → message `QUOTA/rln-secret/v1/n` for n > 0, unchanged for n = 0 | A slashed or withdrawn idCommitment can never re-enroll; each index is a fresh, unlinkable identity |
+| Dynamic slasher = a new server wallet with its share backed up to Dynamic (password-encrypted); only metadata + password kept | The Phase 0 wallet's metadata was not saved, so it cannot sign; no local key share is needed |
+| `DynamicServiceWallet`: MPC accelerator off, up to 3 signing attempts | Signing timed out intermittently (300 s on the accelerator path, ~99 s on the standard path); other attempts took 7–10 s |
+| Local type shim `dynamic-sdk.ts` for `@dynamic-labs-wallet/node-evm` | Its `.d.ts` re-exports `./src/index` without an extension, which NodeNext cannot resolve |
+| pnpm `allowBuilds: protobufjs: false` | Its postinstall (a version check, pulled in via Dynamic → MetaMask libs) is not needed |
+| Software operator passkey persisted as `DEMO_OPERATOR_PASSKEY` (test-only) | A registered passkey cannot be replaced; losing the in-memory key locked out the first Privy wallet |
+| `Broadcaster` option `maxFeePerGas` (scripts use 120 gwei on Monad) | Monad checks limit × max fee + value up front; base fee is ~100 gwei |
 | Client message-id counts are persistent (`FileUsageStore`, written before proving) | Found while building the demo: an honest agent restarted within an epoch would reuse id 0 and slash itself |
 | `SqliteNullifierStore` on `node:sqlite` (Node ≥ 22.13), separate export `@quota/server/sqlite` | No new dependency; servers that don't use it don't load the experimental module |
 | Agent secret `a0 = hashToField(signature over "QUOTA/rln-secret/v1")` (`deriveSecret`, PRD W2) | Recoverable from the wallet, never stored; same message as the Privy gate test |
@@ -87,7 +96,7 @@ Append-only record of what was done, what was observed, and what is still open. 
 **Owner decisions or actions**
 - Qwen: credits, open-weight, or drop (before Phase 7).
 - Nansen credits (otherwise Screener is labels-only).
-- **Named external integrator: due now (Phase 4 is done).**
+- Named external integrator: deferred by the owner (see the Phase 4 re-verification).
 - A human stranger to time the service quickstart (agent-run clean checkout passed).
 - Final public domain for passkeys (before Phase 7).
 - Cleanverse invitation code, only if reopening.
@@ -198,6 +207,7 @@ Append-only record of what was done, what was observed, and what is still open. 
   - Run 1: 3 × `OK` with live Wikipedia results; proofs 552–1429 ms; every root checked with `isKnownRoot` on Monad.
   - Run 2 (restart): `remaining now 2`, 2 × `OK`, then `STOP` at the 6th query.
   - Afterwards the demo's local state (usage file and nullifier DB) was reset together, so the next run starts clean.
+  - **Correction (found 2026-10-05, Phase 5):** that server was *not* stopped. `pkill -f "tsx src/server.ts"` does not match the real command line (`…/tsx/dist/cli.mjs src/server.ts`). The server kept running, slashing off, with its SQLite files deleted under it. The Phase 4 results stand; the clean-state claim was wrong.
 - **Exit check (clean-machine variant):**
   - Fresh `git clone` of the repo into a scratch dir.
   - Quickstart files taken verbatim from the code blocks in `docs/quickstart-service.md`.
@@ -242,3 +252,32 @@ Only triggered on Windows when running scripts directly with `tsx`. Typecheck cl
 - Wall-clock time: **2m 27s** (well under the 10-minute threshold).
 - Cleaned up `apps/my-api` and restored lockfile. Phase 4 exit check complete.
 
+### 2026-10-05 — Phase 5: wallet integrations (Privy agent, Dynamic service)
+- **`@quota/wallets`:**
+  - `PrivyAgentWallet` (sign-only `eth_signTransaction`/`personal_sign` with our authorization key), `agentPolicyRules`, `createAgentWallet`, `updateAgentPolicy`.
+  - `DynamicServiceWallet` (server wallet, signs from the Dynamic-backed share, retries).
+  - Scripts: `probe`, `probe-dynamic-sign`, `dynamic-create-wallet`, `privy-setup [--dev] [--replace]`, `privy-update-policy`, `privy-policy-check [--dev]`, `enroll-privy-agent [--identity n] [--limit n]`, `phase5-e2e [--dev] [--no-slash]`.
+- **Client:** `secretMessage(n)` and `deriveSecret(sign, n)`. **Devtools:** a persistable `SoftPasskey`; `enrollWithSoftPasskey` accepts an external operator and an existing passkey. **Demo:** the agent uses Privy when `PRIVY_AGENT_WALLET_ID` is set (`--identity n`); the server slashes with Dynamic when `DYNAMIC_SLASHER_WALLET` is set.
+- **Probes:**
+  - Privy key quorum: threshold 1, one key.
+  - Dynamic: `getWallets()` returns 404 for API-token auth, but `getWalletByAddress` works. The Phase 0 wallet cannot sign without its saved metadata, so I created `0x7d15…Aee1`; a sign-only test then passed.
+- **Privy setup:**
+  - The first attempt failed: rule names must be under 50 characters. The operator user had already been created, so setup now reuses it by email.
+  - Live policy check 10/10 PASS on both the Monad and the dev wallet (details in gates.md).
+- **Anvil** (`--hardfork osaka --block-time 1`): `phase5-e2e --dev` all PASS.
+  - The first run's Dynamic signature timed out after 300 s (`FORWARD_MPC_TIMEOUT`); I then disabled the accelerator and added retries.
+  - The rerun signed with no retries: commit `0xe6898f0d…`, reveal `0x9a6f7070…`, reward 0.015 to the Dynamic wallet.
+- **Monad `phase5-e2e`:** all PASS.
+  - The Privy wallet registered a passkey and enrolled (index 6), all signed by Privy.
+  - The secret was derived from a Privy signature (identical twice). 3 proofs verified against the on-chain root. The cheat → violation, with the recovered secret equal to the Privy-derived one.
+  - Dynamic signed the commit and reveal, the member is Slashed, and 0.015 reached the Dynamic wallet (its gas was 0.278). No signing retries were needed.
+- **Monad demo (MCP server + Privy agent + Dynamic slasher):**
+  - Replaced the Privy wallet (the first one's passkey was lost) and enrolled identity 0 (index 7, limit 5).
+  - **The first cheat attempt with identity 0 was accepted, not caught.** A stray Phase 4 demo server (slashing off; see the correction above) answered on port 8787. Only 2 of the agent's calls landed in the new server's DB, so the reused id looked fresh. Identity 0 therefore remains Active.
+  - Clean rerun with exactly one server: identity 1 (index 8, limit 2).
+    - 2 OK calls; DB rows for the epoch went 2 → 4; the client stopped at the limit.
+    - `--cheat` → `REJECTED … violation` → server log `[violation]` then `[slash] … commit 0x7372a84d… reveal 0x293a72e6…`.
+    - On-chain: state 4 (Slashed), reveal sent from the Dynamic wallet.
+  - Server processes are now stopped with `pkill -f "src/server.ts"`, and I confirmed none were left.
+- **Tests:** `pnpm test` gives core 12, client 3, server 9, slasher 3, wallets 3 = **30 passed**. New tests: Privy field mapping and the key never being serialized; policy rule shape and name length; Dynamic retry and give-up; identity rotation. `pnpm typecheck` clean. `forge test` 84 passed.
+- **Balances after:** deployer 3.371 MON; Dynamic slasher 0.129; Privy agent wallet 0.048; old local-key slasher 9.228 (topped up by the owner, now unused by the demo).

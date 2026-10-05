@@ -67,8 +67,29 @@ Hosted `qwen3.8-max` is not free; key not set. The agent loop stays provider-agn
 |---|---|---|
 | G0 chain/toolchain/Hello | PASS | none |
 | G1 BTX | FAIL (confirmed) | commit–reveal only; `btx` dropped |
-| G2 Privy | PASS | keep |
-| G3 Dynamic | PARTIAL | keep as server-wallet; delegated access unproven |
+| G2 Privy | PASS (+ owner/policy/additional-signer path PASS in Phase 5) | keep |
+| G3 Dynamic | PARTIAL → server wallet PASS in Phase 5 (incl. live slash) | keep as server-wallet; delegated access still unproven |
 | G4 Cleanverse | FAIL | dropped |
 | G5 Nansen | PARTIAL | conditional; labels only until credits |
 | G6 Qwen | DEFERRED | decide before Phase 7 |
+
+## Phase 5 follow-up (2026-10-05)
+
+**G2 Privy, owner + policy + additional signer: PASS (live).**
+- Setup: an operator user created server-side, plus an agent wallet owned by that user, with our key quorum `cvlhfa0w46j966r07ahobnok` as an additional signer under an override policy.
+- The policy allows:
+  - `eth_signTransaction` only when `to` = registry, `chain_id` = 10143, and `value` ≤ 0.1 MON;
+  - `personal_sign` only for messages that start with `QUOTA/rln-secret/v1`.
+- `scripts/privy-policy-check.ts` result, 10/10 PASS:
+  - The secret message signed 3× gave identical signatures, so it is deterministic under the policy.
+  - `.../v1/1` (identity rotation) signed.
+  - Rejected with `policy_violation`: another message, another contract, a value over the cap, another chain.
+- Used for real on Monad: the Privy wallet registered the passkey and enrolled.
+
+**G3 Dynamic, server wallet: PASS.**
+- New wallet `0x7d150c30971cb7aE8Bf5e9Ce6deb79a12D92Aee1`, TWO_OF_TWO, with its external share backed up to Dynamic and password-encrypted. We keep only the metadata (ids and backup locations), no key share.
+- It signed a commit and a reveal on Monad testnet (txs in `deployments.md`), and the slash reward landed in it.
+- Caveats:
+  - The Phase 0 wallet `0xb1E9…060a` cannot sign from here: its creation metadata (`externalServerKeySharesBackupInfo`) was not saved.
+  - Signing is intermittently slow: one attempt timed out after 300 s (`FORWARD_MPC_TIMEOUT`, accelerator path), another after ~99 s, while other attempts took 7–10 s. The adapter disables the accelerator and retries up to 3×.
+  - **Delegated access is still not tested** and must not be claimed.
