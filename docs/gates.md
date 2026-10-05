@@ -48,7 +48,7 @@ Consequence: W3 uses the documented fallback (Dynamic server wallet) unless the 
 - Sandbox API base URL and request-encryption format are undocumented in public sources, so the credentials could not be tested.
 - Reopen only if the user provides the invitation code before Phase 5 ends. Until then Compliant tree (C8/T3) is cut.
 
-## G5 — Nansen: PARTIAL
+## G5 — Nansen: CUT (owner decision, 2026-10-06)
 
 | Endpoint | Result | Evidence |
 |---|---|---|
@@ -56,6 +56,12 @@ Consequence: W3 uses the documented fallback (Dynamic server wallet) unless the 
 | `related-wallets`, `counterparties` | **FAIL (credits)** | HTTP 403 `insufficient_credits` |
 
 Consequence: the Screener's recidivism rule (T2) needs related-wallets/counterparties. Needs credits (ask Nansen sponsor channel) or Screener falls back to labels + our own funding-source trace from chain data. Nansen stays conditional; cut early if credits don't arrive.
+
+**Re-check 2026-10-06 (live), then cut:**
+- **Plan:** the key is on the **free tier: 10 credits/day, reset at midnight UTC** (response header `x-nansen-plan-notice`).
+- **Costs:** `related-wallets` 1 credit, `counterparties` 5 credits (needs `date: {from, to}`); `labels` returned `insufficient_credits` once the day's budget was spent. The earlier "FAIL (credits)" was the daily budget, not a missing entitlement.
+- **Data:** `related-wallets` and `counterparties` return HTTP 200 with **empty `data`** for our operator wallets. Nansen's `monad` chain is Monad **mainnet**, and every QUOTA operator is a testnet-only wallet, so every operator would screen "clean". The exit check (refuse a wallet related to a slashed one) could only be shown with a staged relation.
+- **Decision (owner):** cut Nansen per the agreed cut order. No Screened tree, no Nansen bounty claim; C8 / T1 / T2 not built.
 
 ## G6 — Qwen: DEFERRED (owner decision, 2026-10-03)
 

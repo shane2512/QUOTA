@@ -75,7 +75,7 @@ Goal: kill unknowns before writing real code.
 - **Flow: PASSED 2026-10-05 on Monad testnet.** It ran both via `phase5-e2e.ts` and through the demo MCP server (the Privy agent cheats, the server's Dynamic slasher slashes).
 - **Key rule: partially met.** The demo agent and slasher now use no local keys. But `.env` still holds `DEPLOYER_PRIVATE_KEY` (deploying and funding test wallets), the test-only `DEMO_OPERATOR_PASSKEY`, and the old `AGENT_PRIVATE_KEY` / `SLASHER_PRIVATE_KEY`. The old ones are fallbacks, unused when the Privy/Dynamic ids are set.
 
-## Phase 6 — Trust tiers (8–10 Oct) — conditional
+## Phase 6 — Trust tiers (8–10 Oct) — **CUT 2026-10-06** (Nansen: free tier 10 credits/day; it indexes Monad mainnet, so testnet operators return empty data; gates.md G5)
 - [ ] **Nansen Screener:** profile a new operator wallet (labels, related wallets, funding, counterparties), sign attestation, Screened tree accepts it; recidivism rule against slashed wallets.
 - [ ] Service console shows tree choice, cluster/concentration stats, slash history.
 - ~~Cleanverse Compliant tree~~ — cut at Phase 0 (gate failed).
@@ -84,13 +84,19 @@ Goal: kill unknowns before writing real code.
 **Exit:** a screened enrollment succeeds for a clean wallet and is refused for a related-to-slashed wallet; (if CVI) a non-verified wallet cannot receive CVA. If neither works by 10 Oct, cut and move on.
 
 ## Phase 7 — Scout agent, consoles, deploy (9–11 Oct)
-- [ ] **Qwen Scout:** tool-calling loop (`quota_status`, `call_tool`, `topup_stake`, `switch_server`), plans a research task across ≥ 2 QUOTA servers inside quota.
-- [ ] Violation script for the slash demo.
-- [ ] Operator console + service console deployed with public URLs and test credentials for judges.
-- [ ] Contracts verified; README access instructions.
-- [ ] Draft the Qwen **article** from the build log.
+- [x] **Scout (model pending):** tool-calling loop with `quota_status`, `call_tool`, `topup_stake`, `switch_server` over ≥ 2 QUOTA servers (demo-mcp `search` + `summary`), behind a provider-agnostic OpenAI-compatible planner.
+  - All four tools exercised live on Monad v3 with a **scripted plan (test tooling, no model)**, including an on-chain `topup_stake` (`topUp` + `changeLimit`) and proofs against the new leaf.
+  - [ ] **Qwen run:** the owner is getting sponsor credits (`QWEN_*` in `.env`).
+- [x] Violation script for the slash demo: `demo-mcp agent --cheat` (Phase 4/5) and `phase5-e2e` (v3 slash, profitable for the slasher).
+- [x] **Registry v3** on the public domain `quota-metro.vercel.app`: one-pass slash removal (reveal −29% gas), unit 0.1 MON, verified on Sourcify. Privy policy repointed (1 MON cap).
+- [ ] Operator console + service console deployed with public URLs and test credentials for judges. **Not started:** `apps/web` belongs to another contributor (ask before touching), and it still shows demo data.
+- [x] Contracts verified (v3); root `README.md` with access instructions (CLI path; no console yet).
+- [x] Draft the Qwen **article** (`docs/qwen-article-draft.md`, with sections marked pending a real Qwen run).
 
-**Exit:** a judge with only the README can log in, enroll, watch Scout work, and see a slash.
+**Exit:** a judge with only the README can log in, enroll, watch Scout work, and see a slash. **Not yet met:**
+- There is no console login yet.
+- Scout has not run with a model.
+- The README path works from the CLI with funded keys.
 
 ## Phase 8 — Hardening, media, submission (11–13 Oct)
 - [ ] Security pass: secrets scan of repo and git history, passkey checks reread, replay tests, `forge coverage` on custody and slash paths.

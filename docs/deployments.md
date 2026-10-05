@@ -4,7 +4,8 @@
 |---|---|---|---|
 | PoseidonT3 (linked library) | `0x791112caa53a60b6353a07c7501d41e750095422` | `0x388510bc…912e` | CREATE2, block 67905047 |
 | QuotaRegistry **v0 (superseded)** | `0x5BaF5568e1dc363781b74d33B89d0e9f4f0D19ad` | `0xe5930e36…2c32` | origin allowlist only `localhost:3000`; not used |
-| QuotaRegistry **v2 (current, dev)** | `0xd89BFd2f093015193d42EA51170D64d9242a40C6` | `0xf198c48ebe7d289ec6653a70fdd893f2d17c46aac8a23d3987c525e259d81c0d` | block 68177360. Adds commit–reveal slash, `limit ≤ 65535`, on-chain `leaves()`. rpId `localhost`; origins `localhost:3000`, `localhost:3777`; depth 20; unit 0.01 MON; unstake delay 2 h; root TTL 10 min; slash share 5000 bps. **Source verified on Sourcify** (`match`, job `e042a576-1351-425e-b824-9ff7038fa365`). |
+| QuotaRegistry **v3 (current)** | `0xCBdfda8ebF4302793C06a402E9753C4F43799990` | `0x74b494737d1895f81239676a04ee4bfdc6782411051d4e94cee94834aa5cedb2` | block 68483949. One-pass leaf removal in slash (reveal −29% gas), rpId `quota-metro.vercel.app`, origin `https://quota-metro.vercel.app` only, depth 20, **unit 0.1 MON**, unstake delay 2 h, root TTL 10 min, slash share 5000 bps. **Source verified on Sourcify** (`match`, job `669c4958-22a7-4402-9a47-036972cd82ad`). Libraries: PoseidonT2 `0xC3cA…6a3E`, PoseidonT3 `0x7911…5422`. |
+| QuotaRegistry **v2 (superseded)** | `0xd89BFd2f093015193d42EA51170D64d9242a40C6` | `0xf198c48ebe7d289ec6653a70fdd893f2d17c46aac8a23d3987c525e259d81c0d` | block 68177360. Adds commit–reveal slash, `limit ≤ 65535`, on-chain `leaves()`. rpId `localhost`; origins `localhost:3000`, `localhost:3777`; depth 20; unit 0.01 MON; unstake delay 2 h; root TTL 10 min; slash share 5000 bps. **Source verified on Sourcify** (`match`, job `e042a576-1351-425e-b824-9ff7038fa365`). |
 | PoseidonT2 (linked library, v2) | `0xC3cAE955c69c26E8b840519d6265C928582A6a3E` | `0xd225e24f3372bb0d36950122e6c7a5f394829a036418665bdb1af48b37c80399` | CREATE2, block 68177357 |
 | QuotaRegistry **v1 (superseded)** | `0x05a5fe209E19C6707e2E701A76A0C94b2351E0ac` | `0x5df69d77…77c9` | Phase 1 passkey evidence below. No slash, no `leaves()`. Not verified on the explorer. |
 | Hello (Phase 0) | `0x30A8e23Db6A8959913986336C749d7C8FCbFF0cf` | `0xf5b1578a…4ae3` | smoke test, source removed from repo |
@@ -139,6 +140,47 @@ Reward 0.015 MON to the Dynamic wallet. Its gas for commit + reveal was 0.278 MO
   - 2 honest MCP calls, then a cheat → violation → slashed by the server: commit `0x7372a84d6166d2df232504898415cf424e0a7498002a6fc3204b65cc95af7381`, reveal `0x293a72e61a7d50fd5f357c784fe2a2f1a786546e6da8c48ceab1da136112381d` (sent from `0x7d15…Aee1`). Member state 4 (Slashed).
 - Dynamic top-up before the demo: `0x0fbf9411994980e5f9f2ae83c4f5124f4545df2fd4d2419de949060c653a4407` (0.3 MON).
 - Leaves 3–5 of v2 come from the Phase 4 re-verification runs (sections above).
+
+## Phase 7: registry v3 (2026-10-06)
+
+**Wallets (after `.env` was replaced and recreated, see progress.md):**
+- Privy agent wallet `0x1Ec0d0992990008Bcf1555FFd809Ca78aE651aA6`. Its policy was updated to the v3 registry with a 1 MON cap.
+- **New** Dynamic slasher wallet `0xe5505A02A68Ff02D55b90e8D8D179b5e2EBd2b15`.
+- The previous Dynamic wallet `0x7d15…Aee1` (0.129 MON) is **stranded**: its password was lost with the old `.env`.
+
+**Two failed enrolls (both reverted; gas charged on the full 2,278,892 limit).**
+
+| Tx | Block |
+|---|---|
+| `0xebf49e5cd45233bdacb83ab13c9b60e016bfd93d72b3ae82bf5010e5d19bb991` | 68486090 |
+| `0xd85f3f10e1a091cedc1d834ab2cf7b2cfd88e3530fdbc09d25c67c4e1db8e5b7` | 68486819 |
+
+- Cause: the operator held about 0.70 MON but needed 0.5 (value) + 2.28M × 120 gwei (0.27). Monad included the transactions anyway, because consensus only checks gas affordability; the value spend then failed at execution.
+- A local `cast run` replay succeeds, because it doesn't model Monad's balance rules.
+- Fixed in the scripts (operator budget = stake + 0.45).
+
+**`phase5-e2e` on v3: all PASS. The slash is profitable.**
+
+| Step | Tx | Note |
+|---|---|---|
+| Fund Privy wallet | `0x85a79336634b373a22670b7d79014f08f9e81852ca9a77fe9ee9d9468d13f09c` | |
+| `enroll` (identity 0, limit 5, stake 0.5) | `0x5a4e3813d9101ebc2b57f8551d1c19aca382e6f20ab38b5e97364c26eda688c8` | index 0; estimate 1,981,646 (first leaf) |
+| Fund Dynamic wallet | `0x5f8fda69f2099f2254412bdbdb2dd894b16488c96336eb620adcf964644b8929` | |
+| `commitSlash` (Dynamic) | `0xf99d556ae3e02a75099d37fa40d2b1908a34dd5fe39a159b787d1b88dc2fe5f1` | estimate 51,914 |
+| `revealSlash` (Dynamic) | `0x52cd4a807aadee6a94c588fae96af17739e411206c8e685d3c6823d6636c84c9` | estimate **1,692,382** (v2: 2,316,921) |
+
+Slasher net: reward 0.25 − gas 0.2046 = **+0.0454 MON**.
+
+**Scout (scripted plan, no model) on v3**, identity 1 (index 1, limit 3 → 4):
+
+| Step | Tx |
+|---|---|
+| Fund Privy wallet | `0xd7420b438a06eba5d07fcd20d5db54c263348c1b46c6f556447d3f9c9eaec914` |
+| `enroll` | `0x0bc44a98cbae1290a7275664b5cd91dbc29d2963867585789b9d0dc36d49f180` |
+| `topup_stake` → `topUp` (+0.1 MON, Privy) | `0x0ceece376d900a8e964584ddd4eb19062c67cad6b430a5ecf9c8fea4d5fb1cb7` |
+| `topup_stake` → `changeLimit(4)` (Privy + operator passkey) | `0x1266fa7c6e68ba1aea0e9fb1294d3c6f3244d3bead2a3f4fc72cf20e45acfce2` |
+
+Funding move: 5 MON from the old local-key slasher `0xb7B8…237f` to the deployer, `0x7dae8679a712bf4b5c1e6fdacf53d3ce5e0ae591640fae8efd4650436246b2ce`.
 
 ## Gas
 

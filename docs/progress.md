@@ -12,8 +12,8 @@ Append-only record of what was done, what was observed, and what is still open. 
 | 3 Slash (commit–reveal) | Done | `pnpm --filter @quota/slasher phase3` all PASS on Monad testnet; forge 84 passed |
 | 4 SDKs, middleware, demo MCP | Done (named integrator deferred by owner) | quickstart 401 → 200 in 2m 27s (target ≤ 10m); 26 unit tests + forge 84 green |
 | 5 Wallet integrations | Done. Privy agent + Dynamic slasher on Monad; key rule partially met (see 03-phases) | Monad e2e all PASS; demo MCP Privy cheat → Dynamic slash on-chain; Privy policy 10/10 live; 30 package tests + forge 84 |
-| 6 Trust tiers (Nansen only) | Not started | |
-| 7 Scout agent, consoles, deploy | Not started | |
+| 6 Trust tiers (Nansen only) | **Cut** 2026-10-06 (owner): free tier 10 credits/day; Nansen indexes Monad mainnet, so testnet operators return empty data | gates.md G5 |
+| 7 Scout agent, consoles, deploy | Partial: registry v3 live (slash profitable), Scout built and exercised live with a scripted plan, README and article draft. Open: Qwen run (key pending), consoles (`apps/web` owner) | v3 e2e PASS; Scout tools live on Monad; 34 package tests + forge 89 |
 | 8 Hardening and submission | Not started | |
 
 ## Log
@@ -84,6 +84,15 @@ Append-only record of what was done, what was observed, and what is still open. 
 | pnpm `allowBuilds: protobufjs: false` | Its postinstall (a version check, pulled in via Dynamic → MetaMask libs) is not needed |
 | Software operator passkey persisted as `DEMO_OPERATOR_PASSKEY` (test-only) | A registered passkey cannot be replaced; losing the in-memory key locked out the first Privy wallet |
 | `Broadcaster` option `maxFeePerGas` (scripts use 120 gwei on Monad) | Monad checks limit × max fee + value up front; base fee is ~100 gwei |
+| Nansen cut (Phase 6) | Owner decision after a live re-check: free tier, and mainnet-only data, so testnet operators always screen clean (gates.md G5) |
+| Registry v3: `_tryRemove` (one pass: old and new root hashed together, written only if the old one matches; `lastSubtrees` updated as in zk-kit `_update`) | Reveal gas 2,215,176 → 1,579,331 (forge, depth 20); Monad estimate 2.32M → 1.69M. Equivalence pinned by `OnePassRemovalTest` (slash first/middle/last, then appends, vs a full recompute) |
+| v3 `UNIT` = 0.1 MON; demo agents use limit 5 | At 0.01 MON a slash cost the slasher more gas than it earned. Now reward 0.25 vs gas ~0.205 (live: +0.045) |
+| v3 allows the single origin `https://quota-metro.vercel.app`; software passkeys use the origin implied by the rpId | A browser never pairs rpId `quota-metro.vercel.app` with a localhost origin; allowing one only for test tooling would weaken the allowlist |
+| `Broadcaster`: before a value transfer, wait ≥ 4 blocks after this sender's previous tx when the remaining balance is < 10 MON | Monad reserve balance: below the reserve, only a sender's first tx in the k = 3 window may spend value |
+| Operator funding for enroll = stake + 0.45 MON | Up front the sender must cover value + gas limit × max fee (~0.27 for the first leaf); 0.2 was too little and cost two reverted enrolls |
+| Scout: provider-agnostic `Planner` (OpenAI-compatible chat completions with tools) + `ScriptedPlanner` (test tooling) | The Qwen key is pending; Qwen is a config change (`QWEN_BASE_URL/API_KEY/MODEL`) |
+| Scout `topup_stake(messages_per_epoch)` = `topUp` + `changeLimit` (operator passkey) | `topUp` alone adds stake but not quota; raising the tier needs the limit change |
+| demo-mcp `QUOTA_TOOLSET` (search / summary / both) | Gives Scout ≥ 2 independent QUOTA servers with different tools |
 | Client message-id counts are persistent (`FileUsageStore`, written before proving) | Found while building the demo: an honest agent restarted within an epoch would reuse id 0 and slash itself |
 | `SqliteNullifierStore` on `node:sqlite` (Node ≥ 22.13), separate export `@quota/server/sqlite` | No new dependency; servers that don't use it don't load the experimental module |
 | Agent secret `a0 = hashToField(signature over "QUOTA/rln-secret/v1")` (`deriveSecret`, PRD W2) | Recoverable from the wallet, never stored; same message as the Privy gate test |
@@ -95,7 +104,7 @@ Append-only record of what was done, what was observed, and what is still open. 
 
 **Owner decisions or actions**
 - Qwen: credits, open-weight, or drop (before Phase 7).
-- Nansen credits (otherwise Screener is labels-only).
+- ~~Nansen credits~~: Nansen cut.
 - Named external integrator: deferred by the owner (see the Phase 4 re-verification).
 - Final public domain for passkeys (before Phase 7).
 - Cleanverse invitation code, only if reopening.
@@ -280,3 +289,26 @@ Only triggered on Windows when running scripts directly with `tsx`. Typecheck cl
   - Server processes are now stopped with `pkill -f "src/server.ts"`, and I confirmed none were left.
 - **Tests:** `pnpm test` gives core 12, client 3, server 9, slasher 3, wallets 3 = **30 passed**. New tests: Privy field mapping and the key never being serialized; policy rule shape and name length; Dynamic retry and give-up; identity rotation. `pnpm typecheck` clean. `forge test` 84 passed.
 - **Balances after:** deployer 3.371 MON; Dynamic slasher 0.129; Privy agent wallet 0.048; old local-key slasher 9.228 (topped up by the owner, now unused by the demo).
+
+### 2026-10-06 — Phase 6 cut; Phase 7: registry v3, Scout, README
+- **Nansen re-check (live):** free tier, 10 credits/day; `related-wallets` 1 credit, `counterparties` 5. Both return empty data for testnet operators (Nansen's `monad` is mainnet). The owner chose to cut it (gates.md G5).
+- **Owner decisions:** Scout uses Qwen via sponsor credits (key pending); public domain `quota-metro.vercel.app`.
+- **Registry v3 (test-first):**
+  - New `OnePassRemovalTest`: 5 tests. Measured baseline reveal gas 2,215,176 (the gas test failed as expected); after `_tryRemove`, 1,579,331.
+  - `forge test` **89 passed**.
+  - Deployed `0xCBdfda8e…9990` (rpId `quota-metro.vercel.app`, unit 0.1 MON) and verified on Sourcify.
+- **`.env` incident:**
+  - `.env` had been replaced (it now holds the teammate's keys and comments). The Phase 5 lines were gone: Privy ids, `DYNAMIC_SLASHER_WALLET`, `DYNAMIC_WALLET_PASSWORD`, `DEMO_OPERATOR_PASSKEY`.
+  - The owner pasted an older `.env` into chat. It lacked those lines, and **it exposed live credentials in the conversation; rotation is recommended** (Privy app secret and auth key, Dynamic token, Nansen and Cleanverse keys).
+  - Recovery: Privy ids restored from `deployments.md`. A new Dynamic slasher `0xe550…2b15` was created (new password). The old Dynamic wallet `0x7d15…Aee1` (0.129 MON) is stranded without its password.
+- **Privy:** policy updated to v3 with a 1 MON cap. Live check **11/11 PASS**: exactly at the cap it signs; cap + 1 wei is rejected.
+- **v3 e2e:**
+  - Two enrolls reverted on-chain, both burning the full 2.28M gas limit. I first suspected Monad's reserve balance (docs read) and added a reserve-window wait to `Broadcaster`. The actual cause was underfunding: 0.70 held vs 0.5 value + 0.27 max gas. Fixed: budget stake + 0.45. (`cast run` replays succeed because they don't model Monad's balance rules.)
+  - Third run: **all PASS**. Index 0 (limit 5, stake 0.5); reveal estimate 1,692,382; Dynamic received 0.25 against 0.2046 gas, **net +0.0454 MON**.
+- **Scout (`apps/scout`):** planner abstraction, tools, loop, CLI; 4 unit tests (fakes, planner request shape).
+- **Scout live on Monad v3** (scripted plan, **no model**; two demo-mcp servers, slashing off), identity 1 (index 1, limit 3):
+  - `quota_status` → `call_tool` search → `switch_server` → 2 × `call_tool` summary (all accepted with real proofs and live Wikipedia data).
+  - `topup_stake(4)`: Privy-signed `topUp` and `changeLimit` with the operator passkey; limit 3 → 4, stake 0.3 → 0.4.
+  - Second run: 3 more calls accepted under the new leaf; the summary quota reached 0.
+- **Repo additions:** `README.md` (overview, addresses, run instructions, honest limits) and `docs/qwen-article-draft.md` (pending sections clearly marked; no invented results).
+- **Funding:** 5 MON moved from the old local-key slasher to the deployer.
