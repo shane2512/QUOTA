@@ -33,7 +33,7 @@ Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An opera
 | 1 Contracts | Done. v2 verified on Sourcify; enroll gas measured on Monad (`eth_estimateGas` 1,299,685) |
 | 2 RLN proofs | Done, including a proof against an on-chain root (closed in the Phase 3 e2e) |
 | 3 Slash (commit–reveal) | Done. On-chain slash with reward on Monad testnet; searcher test in forge. **Independently re-verified 2026-10-05: forge 84/84, pnpm 17/17, typecheck clean, coverage confirmed.** |
-| 4 SDKs, middleware, demo MCP | Done. Express/Hono/MCP middleware, demo MCP server live against v2, quickstarts; clean-checkout quickstart passed (human-stranger timing still open). **Re-verified 2026-10-05: forge 84/84, pnpm 26/26, typecheck clean, phase3 e2e 14/14 PASS on testnet. MCP live demo: 5 × OK + 1 × REJECTED (violation 429) + server-initiated on-chain slash. Windows path bug (fileURLToPath) found and fixed. Active demo agent index 5.** |
+| 4 SDKs, middleware, demo MCP | Done. Express/Hono/MCP middleware, demo MCP server live against v2, quickstarts; quickstart timing verified in 2m 27s (target ≤ 10m). **Re-verified 2026-10-05: forge 84/84, pnpm 26/26, typecheck clean, phase3 e2e 14/14 PASS on testnet. MCP live demo: 5 × OK + 1 × REJECTED (violation 429) + server-initiated on-chain slash. Windows path bug (fileURLToPath) found and fixed. Active demo agent index 5.** |
 | 5 Wallet integrations | **Next** |
 | 6–8 | Not started |
 
@@ -269,8 +269,7 @@ Exit check: the end-to-end flow runs with Privy on the agent side and Dynamic on
 ## 10. Open items needing the owner
 - Qwen decision.
 - Nansen credits.
-- **A named external integrator (overdue: Phase 4 is done).**
-- Someone outside the team to time the service quickstart.
+- **A named external integrator (Phase 4 item, deferred by owner).**
 - Approval before publishing packages to npm (if wanted).
 - Final public domain (needed for the Phase 7 redeploy).
 - Faucet top-up: deployer **5.159 MON**, slasher **9.734 MON** (well funded; no immediate top-up needed). A redeploy costs ~0.84 MON, a slash ~0.28 MON.

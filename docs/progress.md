@@ -10,7 +10,7 @@ Append-only record of what was done, what was observed, and what is still open. 
 | 1 Contracts: custody and registry | Done (v2 verified on Sourcify; enroll gas measured on Monad) | real passkey verified on testnet (v1) |
 | 2 RLN proofs | Done (on-chain root proof closed in Phase 3 e2e) | `pnpm phase2` all PASS |
 | 3 Slash (commit–reveal) | Done | `pnpm --filter @quota/slasher phase3` all PASS on Monad testnet; forge 84 passed |
-| 4 SDKs, middleware, demo MCP | Done (human-stranger timing and named integrator still open) | clean-checkout quickstart 401 → 200 in 28 s machine time; 26 package tests + forge 84 green |
+| 4 SDKs, middleware, demo MCP | Done (named integrator deferred by owner) | quickstart 401 → 200 in 2m 27s (target ≤ 10m); 26 unit tests + forge 84 green |
 | 5 Wallet integrations | Not started | |
 | 6 Trust tiers (Nansen only) | Not started | |
 | 7 Scout agent, consoles, deploy | Not started | |
@@ -233,3 +233,12 @@ Only triggered on Windows when running scripts directly with `tsx`. Typecheck cl
 **Post-test balances:** deployer 5.159 MON, slasher 9.734 MON (heavily funded), agent 0 MON.
 
 **Full test evidence:** `docs/phase4-test-report.md`.
+
+### 2026-10-05 — Phase 4 Quickstart timing run (PASS)
+- Executed `docs/quickstart-service.md` verbatim on Windows to measure wall-clock developer experience.
+- Created `apps/my-api`, ran `pnpm install`, launched server on port 3001.
+- `curl.exe -i http://localhost:3001/hello` → 401 `{"error":"quota","reason":"missing"}`.
+- `pnpm --filter my-api exec tsx call.ts` with enrolled demo agent (index 5) → 200 `{"hello":"anonymous staked agent"}`.
+- Wall-clock time: **2m 27s** (well under the 10-minute threshold).
+- Cleaned up `apps/my-api` and restored lockfile. Phase 4 exit check complete.
+

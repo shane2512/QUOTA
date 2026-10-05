@@ -136,9 +136,33 @@ Only triggered on Windows when running scripts directly with tsx. Typecheck clea
 
 ---
 
-## 8. Remaining (not blocking Phase 5)
+## 8. Quickstart Timing Run — PASS (2026-10-05)
 
-- **External integrator** — named person outside the team to integrate the SDK (still overdue).
-- **Human quickstart timing** — a stranger runs `docs/quickstart-service.md` and records wall-clock time.
+Service quickstart from `docs/quickstart-service.md` executed step-by-step:
+1. Created `apps/my-api/package.json` & `apps/my-api/server.ts` matching guide.
+2. Ran `pnpm install` and launched server on port 3001.
+3. Unauthenticated request:
+   ```
+   $ curl.exe -i http://localhost:3001/hello
+   HTTP/1.1 401 Unauthorized
+   {"error":"quota","reason":"missing"}
+   ```
+4. Authenticated request with enrolled agent (index 5):
+   ```
+   $ pnpm --filter my-api exec tsx call.ts
+   200 {"hello":"anonymous staked agent"}
+   ```
+5. Server log stayed clean throughout.
+6. Timing:
+   - Start: 13:54:40 IST
+   - Complete: 13:57:07 IST
+   - Total wall-clock time: **2m 27s** (Target: ≤ 10m). **PASS.**
+
+---
+
+## 9. Remaining
+
+- **External integrator** — named person outside the team to integrate the SDK (deferred by owner).
 - **npm publish** — needs owner approval.
 - **Slash economics** — at unit 0.01 MON and 50% share, a slash pays off only when stake > ~0.57 MON. Fix at Phase 7 redeploy.
+
