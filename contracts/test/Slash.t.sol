@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {PoseidonT2} from "poseidon-solidity/PoseidonT2.sol";
+import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
 import {PasskeyAuth} from "../src/PasskeyAuth.sol";
 import {QuotaRegistry} from "../src/QuotaRegistry.sol";
 import {Base} from "./QuotaRegistry.t.sol";
@@ -331,5 +332,107 @@ contract LimitAndLeavesTest is Base {
         o[0] = ORIGIN;
         vm.expectRevert(QuotaRegistry.BadShare.selector);
         new QuotaRegistry(RP, o, DEPTH, UNIT, DELAY, TTL, 10_000);
+    }
+}
+
+/// v3: the reveal removes the leaf in one pass over the path. These tests pin its equivalence with zk-kit's
+/// _remove, including the cached `lastSubtrees` that later appends depend on.
+contract OnePassRemovalTest is Base {
+    uint256 constant S0 = 0x5150;
+    uint256 constant S1 = 0x5151;
+    uint256 constant S2 = 0x5152;
+    address payable slasher = payable(address(0x5EA5));
+
+    function setUp() public override {
+        super.setUp();
+        _register();
+        vm.deal(op, 1000 ether);
+    }
+
+    function _id(uint256 a0) internal returns (uint256) {
+        return PoseidonT2.hash([a0]);
+    }
+
+    function _slash(uint256 a0, uint256[] memory leaves, uint256 index) internal {
+        bytes32 salt = keccak256(abi.encode(a0));
+        reg.commitSlash(keccak256(abi.encode(a0, slasher, salt)));
+        vm.roll(block.number + 1);
+        (uint256[] memory sib, uint8[] memory path) = _proof(leaves, index);
+        reg.revealSlash(a0, slasher, salt, sib, path);
+    }
+
+    function _check(uint256 lastSlashed) internal {
+        // three members, slash one, then append two more: every root must equal the reference recompute
+        uint256[] memory l = new uint256[](5);
+        uint256[3] memory s = [S0, S1, S2];
+        for (uint256 i; i < 3; i++) {
+            _enroll(_id(s[i]), 1);
+            l[i] = _leaf(_id(s[i]), 1);
+        }
+        uint256[] memory three = new uint256[](3);
+        for (uint256 i; i < 3; i++) three[i] = l[i];
+        _slash(s[lastSlashed], three, lastSlashed);
+        assertFalse(reg.pendingRemoval(_id(s[lastSlashed])), "removed in the reveal");
+        l[lastSlashed] = 0;
+        uint256[] memory cur = new uint256[](3);
+        for (uint256 i; i < 3; i++) cur[i] = l[i];
+        assertEq(reg.root(), _refRoot(cur));
+        _enroll(_id(0xA1), 1);
+        _enroll(_id(0xA2), 1);
+        l[3] = _leaf(_id(0xA1), 1);
+        l[4] = _leaf(_id(0xA2), 1);
+        assertEq(reg.root(), _refRoot(l), "appends after a one-pass removal");
+    }
+
+    function test_onePass_slashLast_thenAppend() public {
+        _check(2);
+    }
+
+    function test_onePass_slashFirst_thenAppend() public {
+        _check(0);
+    }
+
+    function test_onePass_slashMiddle_thenAppend() public {
+        _check(1);
+    }
+
+    function test_onePass_wrongSiblings_paysAndMarksPending() public {
+        _enroll(_id(S0), 1);
+        _enroll(_id(S1), 1);
+        (uint256[] memory sib, uint8[] memory path) = _proof(_two(_leaf(_id(S0), 1), _leaf(_id(S1), 1)), 1);
+        sib[0] += 1;
+        bytes32 salt = keccak256("x");
+        reg.commitSlash(keccak256(abi.encode(S1, slasher, salt)));
+        vm.roll(block.number + 1);
+        uint256 rootBefore = reg.root();
+        reg.revealSlash(S1, slasher, salt, sib, path);
+        assertTrue(reg.pendingRemoval(_id(S1)));
+        assertEq(reg.root(), rootBefore, "nothing written on a bad proof");
+        assertEq(slasher.balance, UNIT * SHARE / 10_000);
+    }
+
+    /// Reveal gas at depth 20 (the deployed depth). v2 hashed the path 3x (~60 Poseidon calls); v3 2x (~40).
+    function test_onePass_revealGas_depth20() public {
+        string[] memory o = new string[](1);
+        o[0] = ORIGIN;
+        reg = new QuotaRegistry(RP, o, 20, UNIT, DELAY, TTL, SHARE);
+        _register();
+        _enroll(_id(S0), 1);
+        uint256[] memory sib = new uint256[](20);
+        uint8[] memory path = new uint8[](20);
+        uint256 z;
+        for (uint256 i; i < 20; i++) {
+            sib[i] = z; // empty siblings: zero hashes, zero leaf 0
+            z = PoseidonT3.hash([z, z]);
+        }
+        bytes32 salt = keccak256("g");
+        reg.commitSlash(keccak256(abi.encode(S0, slasher, salt)));
+        vm.roll(block.number + 1);
+        uint256 g = gasleft();
+        reg.revealSlash(S0, slasher, salt, sib, path);
+        uint256 used = g - gasleft();
+        emit log_named_uint("revealSlash gas (depth 20)", used);
+        assertFalse(reg.pendingRemoval(_id(S0)));
+        assertLt(used, 1_700_000, "one-pass removal");
     }
 }

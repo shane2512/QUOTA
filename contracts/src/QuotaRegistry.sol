@@ -104,6 +104,7 @@ contract QuotaRegistry {
     error RevealTooEarly();
     error NotSlashable();
     error NotPendingRemoval();
+    error BadProof();
 
     constructor(
         string memory rpId,
@@ -361,13 +362,8 @@ contract QuotaRegistry {
 
         bool removed = st != State.Active;
         if (st == State.Active) {
-            uint256 leaf = PoseidonT3.hash([id, uint256(m.limit)]);
-            if (siblings.length == tree.depth && path.length == tree.depth && tree._verify(leaf, siblings, path)) {
-                _removeLeaf(leaf, siblings, path);
-                removed = true;
-            } else {
-                pendingRemoval[id] = true;
-            }
+            removed = _tryRemove(PoseidonT3.hash([id, uint256(m.limit)]), siblings, path);
+            if (!removed) pendingRemoval[id] = true;
         }
         emit Slashed(id, receiver, reward, stake - reward, removed);
         (bool ok,) = receiver.call{value: reward}("");
@@ -378,18 +374,53 @@ contract QuotaRegistry {
     function removeSlashedLeaf(uint256 idCommitment, uint256[] calldata siblings, uint8[] calldata path) external {
         if (!pendingRemoval[idCommitment]) revert NotPendingRemoval();
         delete pendingRemoval[idCommitment];
-        _removeLeaf(PoseidonT3.hash([idCommitment, uint256(_members[idCommitment].limit)]), siblings, path);
+        if (!_tryRemove(PoseidonT3.hash([idCommitment, uint256(_members[idCommitment].limit)]), siblings, path)) {
+            revert BadProof();
+        }
     }
 
     // --------------------------------------------------------------- internal
 
-    function _removeLeaf(uint256 leaf, uint256[] calldata siblings, uint8[] calldata path) private {
+    /// Remove `leaf` (set it to the zero leaf 0) in ONE pass over the path: the old and the new root are hashed
+    /// side by side, and nothing is written unless the old one equals the current root. zk-kit's _remove would
+    /// verify the proof and then hash the path twice more (~60 Poseidon calls vs ~40 here; slashing gas is what
+    /// makes small slashes unprofitable). The `lastSubtrees` cache is updated exactly as InternalBinaryIMT._update
+    /// does, so later appends stay correct (pinned by OnePassRemovalTest against a full reference recompute).
+    /// Returns false (no state change) if the proof does not match the current root.
+    function _tryRemove(uint256 leaf, uint256[] calldata siblings, uint8[] calldata path) private returns (bool) {
+        uint256 depth = tree.depth;
+        if (siblings.length != depth || path.length != depth) return false;
+        uint256 oldHash = leaf;
+        uint256 newHash = 0; // zero leaf
+        uint256[] memory newNodes = new uint256[](depth); // new node value at each level, before hashing upward
+        for (uint256 i; i < depth; i++) {
+            uint256 sib = siblings[i];
+            uint8 bit = path[i];
+            if (sib >= SNARK_SCALAR_FIELD || bit > 1) return false;
+            newNodes[i] = newHash;
+            if (bit == 0) {
+                oldHash = PoseidonT3.hash([oldHash, sib]);
+                newHash = PoseidonT3.hash([newHash, sib]);
+            } else {
+                oldHash = PoseidonT3.hash([sib, oldHash]);
+                newHash = PoseidonT3.hash([sib, newHash]);
+            }
+        }
         uint256 prev = tree.root;
-        tree._remove(leaf, siblings, path);
+        if (oldHash != prev) return false;
+        for (uint256 i; i < depth; i++) {
+            if (path[i] == 0) {
+                if (siblings[i] == tree.lastSubtrees[i][1]) tree.lastSubtrees[i][0] = newNodes[i];
+            } else {
+                if (siblings[i] == tree.lastSubtrees[i][0]) tree.lastSubtrees[i][1] = newNodes[i];
+            }
+        }
+        tree.root = newHash;
         _rootChanged(prev);
         uint256 idx = _index(path);
         leafAt[idx] = 0;
         emit LeafSet(idx, 0);
+        return true;
     }
 
     function _rootChanged(uint256 prev) private {
