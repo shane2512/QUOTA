@@ -14,7 +14,7 @@ try {
   console.log("privy key quorum: ERROR", (e as Error).message.slice(0, 200));
 }
 
-const dyn = dynamicEvmClient(env("DYNAMIC_ENVIRONMENT_ID"));
+const dyn = await dynamicEvmClient(env("DYNAMIC_ENVIRONMENT_ID"));
 await dyn.authenticateApiToken(env("DYNAMIC_API_TOKEN"));
 const addr = process.argv[2] || "0xb1E9a0311088528F6cD90316a7f3c7E86d43060a"; // Phase 0 gate wallet
 try {

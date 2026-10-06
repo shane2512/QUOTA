@@ -22,7 +22,7 @@ export class DynamicServiceWallet implements WalletAdapter {
   /// `metadataB64` is DYNAMIC_SLASHER_WALLET: base64 JSON of the walletMetadata returned at creation (ids and
   /// backup locations only, no key material).
   static async connect(o: { environmentId: string; apiToken: string; metadataB64: string; password: string }): Promise<DynamicServiceWallet> {
-    const client = dynamicEvmClient(o.environmentId);
+    const client = await dynamicEvmClient(o.environmentId);
     await client.authenticateApiToken(o.apiToken);
     const metadata = JSON.parse(Buffer.from(o.metadataB64, "base64").toString("utf8")) as Record<string, unknown>;
     return new DynamicServiceWallet(client, metadata, o.password, metadata.accountAddress as Address);

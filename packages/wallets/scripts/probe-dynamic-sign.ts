@@ -5,7 +5,7 @@ import { parseTransaction, recoverTransactionAddress } from "viem";
 
 process.loadEnvFile(fileURLToPath(new URL("../../../.env", import.meta.url)));
 const addr = process.argv[2] || "0xb1E9a0311088528F6cD90316a7f3c7E86d43060a";
-const dyn = dynamicEvmClient(process.env.DYNAMIC_ENVIRONMENT_ID!);
+const dyn = await dynamicEvmClient(process.env.DYNAMIC_ENVIRONMENT_ID!);
 await dyn.authenticateApiToken(process.env.DYNAMIC_API_TOKEN!);
 const w = process.env.DYNAMIC_SLASHER_WALLET
   ? JSON.parse(Buffer.from(process.env.DYNAMIC_SLASHER_WALLET, "base64").toString("utf8"))

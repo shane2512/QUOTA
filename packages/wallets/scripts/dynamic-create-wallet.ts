@@ -9,7 +9,7 @@ import { dynamicEvmClient } from "../src/dynamic-sdk.ts";
 const envPath = fileURLToPath(new URL("../../../.env", import.meta.url));
 process.loadEnvFile(envPath);
 if (/^DYNAMIC_SLASHER_WALLET=./m.test(readFileSync(envPath, "utf8"))) throw new Error("DYNAMIC_SLASHER_WALLET already set");
-const dyn = dynamicEvmClient(process.env.DYNAMIC_ENVIRONMENT_ID!);
+const dyn = await dynamicEvmClient(process.env.DYNAMIC_ENVIRONMENT_ID!);
 await dyn.authenticateApiToken(process.env.DYNAMIC_API_TOKEN!);
 // Dynamic encrypts the backed-up share with this password; it is required to sign later. Generated, never printed.
 let password = process.env.DYNAMIC_WALLET_PASSWORD;
