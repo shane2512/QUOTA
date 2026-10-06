@@ -322,6 +322,22 @@ Identities already used: 0 (index 7, Active, limit 5) and 1 (index 8, Slashed). 
 - **Two QUOTA servers:** `QUOTA_TOOLSET=search` on :8787 (`demo-search.quota`) and `summary` on :8788 (`demo-summary.quota`).
 - `README.md`, `docs/qwen-article-draft.md`.
 
+### Session report (2026-10-06)
+- **Phase 7 exit check NOT met.** It needs a judge to go from the README to login, enrol, watch Scout and see a slash. Missing: Scout has not run with a model (the Qwen key is pending), and there are no consoles (`apps/web`). The README path works from the CLI with funded keys.
+- **Phase 6 cut (owner decision)** after a live re-check:
+  - Nansen free tier: 10 credits/day (`related-wallets` 1 credit, `counterparties` 5).
+  - Nansen's `monad` chain is mainnet, so every testnet operator returns empty data and screens "clean". The refusal case could only have been staged.
+  - Evidence: `gates.md` G5. The Nansen bounty is not claimed.
+- **Owner decisions:** Scout uses Qwen through sponsor credits; public passkey domain `quota-metro.vercel.app`.
+- **Evidence:** 34 package tests (core 12, client 3, server 9, slasher 3, wallets 3, scout 4), `forge test` 89, typecheck clean; v3 e2e and the scripted Scout run on Monad (txs in `deployments.md`).
+- **Problems hit:**
+  - **Two v3 enrolls reverted on-chain**, each charged its full 2.28M gas limit (~0.2 MON each). The operator was underfunded (0.70 held vs 0.5 value + 0.27 max gas). Monad includes such a transaction and it reverts at execution. Fixed: budget stake + 0.45 MON.
+  - While investigating, I added a wait in `Broadcaster` for Monad's 10 MON reserve-balance window before value transfers.
+  - **`.env` was replaced** with the teammate's file and lost the Phase 5 lines. The Privy ids were restored from `deployments.md`. A new Dynamic slasher `0xe550…2b15` was created. The old Dynamic wallet `0x7d15…Aee1` (0.129 MON) is unrecoverable (password lost).
+  - The owner pasted an older `.env` into chat, which **exposed live credentials**; they must be rotated (§10). It is not stored in any file.
+- **Funding:** 5 MON moved from the old local-key slasher `0xb7B8…237f` (ours) to the deployer.
+- **Commits:** local only. Six commits ahead of `origin/main` at the end of this session (Phase 5 + Phase 7); nothing pushed.
+
 ## 9. What to do next (rest of Phase 7, then Phase 8)
 1. **Qwen run** (when `QWEN_BASE_URL/QWEN_API_KEY/QWEN_MODEL` are set):
    - Run Scout on a real research goal with both servers.
@@ -350,7 +366,7 @@ Identities already used: 0 (index 7, Active, limit 5) and 1 (index 8, Slashed). 
 - Balances (2026-10-06): deployer 5.14 MON, Privy agent 0.34, Dynamic slasher 0.41, old local-key slasher 4.23 (funding reserve).
 - Read access for the organizers' account.
 - Community group (or skip).
-- Push approval for the local commits (includes the Windows fileURLToPath fix).
+- **Push approval:** local `main` is ahead of `origin/main` (Phase 5 wallets, the Phase 6 cut, Phase 7 v3/Scout/README). Nothing is pushed.
 - The Vercel deployment `https://quota-metro.vercel.app` shows mock data; do not present it as live results.
 
 ## 11. Working-tree note
