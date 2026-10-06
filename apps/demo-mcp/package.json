@@ -7,6 +7,7 @@
   "scripts": {
     "start": "tsx src/server.ts",
     "agent": "tsx src/agent.ts",
+    "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

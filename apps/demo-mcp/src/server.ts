@@ -22,6 +22,7 @@ import { QuotaVerifier, RegistryRootChecker, quotaExpress, quotaTool, type Viola
 import { SqliteNullifierStore } from "@quota/server/sqlite";
 import { Broadcaster, CommitRevealPath, LocalKeyWallet, Slasher, type WalletAdapter } from "@quota/slasher";
 import { DynamicServiceWallet } from "@quota/wallets/dynamic";
+import { Feed } from "./feed.ts";
 
 try {
   process.loadEnvFile(fileURLToPath(new URL("../../../.env", import.meta.url)));
@@ -37,6 +38,7 @@ const SERVER_ID = process.env.QUOTA_SERVER_ID || "demo-mcp.quota";
 const DB = process.env.QUOTA_DB || fileURLToPath(new URL("../data/nullifiers.db", import.meta.url));
 const registry = need("QUOTA_REGISTRY_ADDRESS") as Address;
 const chain = createPublicClient({ transport: http(need("MONAD_RPC_URL")) });
+const feed = new Feed(); // live data for the service console, served at GET /feed
 
 // ---- optional slasher
 let slasher: Slasher | undefined;
@@ -60,12 +62,19 @@ if (process.env.QUOTA_SLASH === "1") {
     path: new CommitRevealPath(tx, registry),
     broadcaster: tx,
     receiver: (process.env.SLASH_RECEIVER as Address) || tx.wallet.address,
-    onOutcome: (o) =>
+    onOutcome: (o) => {
+      feed.slash({
+        idCommitment: BigInt(o.idCommitment),
+        status: o.status,
+        commit: o.status === "slashed" ? o.result.commit.hash : undefined,
+        reveal: o.status === "slashed" ? o.result.reveal.hash : undefined,
+      });
       console.log(
         o.status === "slashed"
           ? `[slash] ${o.idCommitment}: commit ${o.result.commit.hash} reveal ${o.result.reveal.hash}`
           : `[slash] ${o.idCommitment}: ${o.status} ${"reason" in o ? o.reason : o.error}`,
-      ),
+      );
+    },
   });
 }
 
@@ -77,6 +86,7 @@ const verifier = new QuotaVerifier({
   roots: new RegistryRootChecker(chain, registry),
   store: new SqliteNullifierStore(DB),
   epochLength: Number(process.env.QUOTA_EPOCH_SECONDS || 3600),
+  onResult: feed.result,
   onViolation: (v: Violation) => {
     console.log(`[violation] message-id reuse; idCommitment ${v.idCommitment} (secret recovered, not logged)`);
     if (slasher) void slasher.enqueue(v);
@@ -138,6 +148,11 @@ function mcpServer() {
 // ---- HTTP
 const app = express();
 app.use(express.json());
+// Public, read-only: short nullifiers, statuses and tx hashes only (see feed.ts).
+app.get("/feed", (_req, res) => {
+  res.setHeader("access-control-allow-origin", "*");
+  res.json({ serverId: SERVER_ID, registry, slashing: !!slasher, epochSeconds: Number(process.env.QUOTA_EPOCH_SECONDS || 3600), ...feed.snapshot() });
+});
 app.get("/health", (_req, res) => void res.json({ ok: true, serverId: SERVER_ID, registry, slashing: !!slasher }));
 app.get("/api/search", quotaExpress(verifier), async (req, res) => {
   res.json(await wikipedia(String(req.query.q ?? ""), 5));
