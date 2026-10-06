@@ -356,6 +356,12 @@ Identities already used: 0 (index 7, Active, limit 5) and 1 (index 8, Slashed). 
    - Submit by 13 Oct evening.
 4. **Optional:** move `requestUnstake`/`changeLimit` to the one-pass update too (gas). That needs a redeploy, so only do it if the consoles need it.
 
+## 9b. Operator console plan (decided 2026-10-06; not built)
+- Browser: `@privy-io/react-auth` login (email) on `quota-metro.vercel.app`; a real WebAuthn credential created with `rp.id = quota-metro.vercel.app` (the registry's immutable rpId); assertions signed per action with the challenge from §5 (the working browser code is in `contracts/tools/passkey-demo/index.html`: DER parse, low-s, challenge).
+- Server routes in `apps/web` (verify the Privy access token first): (1) ensure the user's agent wallet (`createAgentWallet`: owner = the user, our key quorum additional signer, policy to the registry); (2) return `idCommitment` for identity n (`deriveSecret` via that wallet, never the secret); (3) relay a registry call signed by that wallet with the browser's passkey assertion (the contract rejects it without a valid assertion).
+- The live service console already works (`/service`, `/api/service`). Its request feed needs `FEED_URL` pointing at a reachable demo server (`GET /feed`); hosting on Render is parked.
+- Owner setup needed first: Privy dashboard (allowed origins `https://quota-metro.vercel.app` and `http://localhost:3000`, email login on, public app ID), Vercel env vars (`NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_AUTH_PRIVATE_KEY`, `PRIVY_AUTH_KEY_QUORUM_ID`, a funded relayer path for gas), and **rotate the credentials that were pasted into chat before putting them in Vercel**.
+
 ## 10. Open items needing the owner
 - **Qwen key** (sponsor credits) → `QWEN_BASE_URL`, `QWEN_API_KEY`, `QWEN_MODEL` in `.env`.
 - **Rotate the credentials pasted into chat on 2026-10-06:** Privy app secret + authorization key, Dynamic API token, Nansen key, Cleanverse keys. After rotating, update `.env`, and re-run `privy-policy-check` if the Privy key quorum changes.
