@@ -10,7 +10,7 @@
 | QuotaRegistry **v1 (superseded)** | `0x05a5fe209E19C6707e2E701A76A0C94b2351E0ac` | `0x5df69d77…77c9` | Phase 1 passkey evidence below. No slash, no `leaves()`. Not verified on the explorer. |
 | Hello (Phase 0) | `0x30A8e23Db6A8959913986336C749d7C8FCbFF0cf` | `0xf5b1578a…4ae3` | smoke test, source removed from repo |
 
-`rpId` and allowed origins are immutable, so the registry must be redeployed for the final public domain (Phase 7). v2 source is verified on Sourcify; v1 is not.
+`rpId` and allowed origins are immutable, so the registry must be redeployed for the final public domain (Phase 7). v3 source is verified on Sourcify (re-verified 2026-10-06: creation and runtime `match`, job `b24ecb12-8a6c-4d41-9105-e11004e05d1d`). v2 and v1 are superseded and do **not** currently show a Sourcify match (a 2026-10-06 lookup returned `match: null` for v2 despite an earlier recorded verification).
 
 ## Phase 1 exit check: real passkey on-chain (registry v1)
 

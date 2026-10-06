@@ -30,7 +30,7 @@ Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An opera
 | Phase | State |
 |---|---|
 | 0 Gates | Done (Qwen deferred by owner) |
-| 1 Contracts | Done. v2 verified on Sourcify; enroll gas measured on Monad (`eth_estimateGas` 1,299,685) |
+| 1 Contracts | Done. Current registry (v3) verified on Sourcify (v2/v1 superseded, no match); enroll gas measured on Monad (`eth_estimateGas` 1,299,685) |
 | 2 RLN proofs | Done, including a proof against an on-chain root (closed in the Phase 3 e2e) |
 | 3 Slash (commit–reveal) | Done. On-chain slash with reward on Monad testnet; searcher test in forge. **Independently re-verified 2026-10-05: forge 84/84, pnpm 17/17, typecheck clean, coverage confirmed.** |
 | 4 SDKs, middleware, demo MCP | Done. Express/Hono/MCP middleware, demo MCP server live against v2, quickstarts; quickstart timing verified in 2m 27s (target ≤ 10m). **Re-verified 2026-10-05: forge 84/84, pnpm 26/26, typecheck clean, phase3 e2e 14/14 PASS on testnet. MCP live demo: 5 × OK + 1 × REJECTED (violation 429) + server-initiated on-chain slash. Windows path bug (fileURLToPath) found and fixed. Active demo agent index 5.** |

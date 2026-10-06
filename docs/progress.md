@@ -312,3 +312,12 @@ Only triggered on Windows when running scripts directly with `tsx`. Typecheck cl
   - Second run: 3 more calls accepted under the new leaf; the summary quota reached 0.
 - **Repo additions:** `README.md` (overview, addresses, run instructions, honest limits) and `docs/qwen-article-draft.md` (pending sections clearly marked; no invented results).
 - **Funding:** 5 MON moved from the old local-key slasher to the deployer.
+
+### 2026-10-06 — Review of Phases 5–7 and follow-ups (owner's machine, Windows)
+- **Pulled** the teammate's Phase 4–7 commits (up to `0dbd8a9`) and re-ran what is offline. Results: `forge test` 89 passed; typecheck clean; package tests core 12, client 3, server 9, slasher 3, scout 4 passed. `@quota/wallets` tests failed on Windows (0/3) because `dynamic-sdk.ts` imported the Dynamic native SDK at load time.
+- **Fixed:** the Dynamic SDK is now imported lazily (`dynamicEvmClient` is async). Wallets tests pass on Windows (3/3). Only code that actually signs with Dynamic still needs Linux/macOS.
+- **On-chain checks (read-only):** v3 parameters match the docs (unit 0.1 MON, 5000 bps, 7200 s, 600 s, depth 20, rpId hash = sha256("quota-metro.vercel.app"), 2 leaves, `totalBurned` 0.25 MON). All 59 transaction hashes in `deployments.md` exist; 57 succeeded and the 2 that reverted are the two documented failed enrolls.
+- **Sourcify:** a lookup showed no match for v2 or v3 although the docs said "verified". Re-ran `forge verify-contract` for v3 (with the PoseidonT2/T3 library addresses): `match` for creation and runtime. v2 was not re-verified (superseded; its source would need the older commit).
+- **Secrets scan** of the working tree and all 38 commits: no credentials; the only `.env` values found in history are public (RPC URL, registry address, a Privy key-quorum ID).
+- **Review findings, not yet fixed:** Scout's `topup_stake` uses a software passkey from `.env`, so no human approves it in the Scout path (capped by `SCOUT_MAX_LIMIT` = 10 and the Privy policy's 1 MON cap); a slasher that submits stale siblings leaves a slashed leaf in the tree until `removeSlashedLeaf` is called.
+- **Owner decisions:** Qwen is left for now; the `apps/web` contributor from the handoff is the owner.

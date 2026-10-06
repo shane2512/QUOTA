@@ -28,7 +28,7 @@ Goal: kill unknowns before writing real code.
 - [x] Test vectors: valid, wrong challenge, wrong origin, wrong rpId, missing UP/UV, high-s, replayed nonce, malformed JSON.
 - [x] `QuotaRegistry`: tree (Poseidon), `registerPasskey`, `enroll`, `topUp`, `requestUnstake`/`unstake`, recent-roots window.
 - [x] Measure enroll gas on Monad: `eth_estimateGas` 1,299,685 on registry v2, depth 20 (`docs/deployments.md`).
-- [x] Deployed to testnet. [x] Explorer source verification: v2 verified on Sourcify (v1 not verified, superseded).
+- [x] Deployed to testnet. [x] Explorer source verification: v3 (current) verified on Sourcify; v2/v1 are superseded and show no match.
 
 **Exit:** `forge test` green incl. all negative cases; a real browser passkey assertion verifies on-chain on testnet.
 
@@ -100,7 +100,7 @@ Goal: kill unknowns before writing real code.
 
 ## Phase 8 — Hardening, media, submission (11–13 Oct)
 - [ ] Security pass: secrets scan of repo and git history, passkey checks reread, replay tests, `forge coverage` on custody and slash paths.
-- [ ] Threat model doc + "why not roll your own" page.
+- [x] Threat model (`docs/threat-model.md`) + "why not roll your own" page (`docs/why-not-roll-your-own.md`), written 2026-10-06 from the code and tests.
 - [ ] **Technical demo video (≤ 3 min, live product, no slides):** enroll with passkey → Scout makes anonymous requests → violation → slash lands. Show the tx.
 - [ ] **Pitch video (≤ 2 min):** team, problem, why.
 - [ ] Optional 30 s ad. Logo/graphic (JPG/PNG/WEBP ≤ 3 MB).
