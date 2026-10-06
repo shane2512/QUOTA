@@ -1,90 +1,132 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { servers, slashes, short } from "@/lib/demo";
+import { useEffect, useState } from "react";
+import { EXPLORER, REGISTRY } from "@/lib/registry";
 
-type Row = { id: number; t: string; nul: string; k: number; bad: boolean };
-const now = () => new Date().toTimeString().slice(0, 8);
+type Chain = {
+  registry: string; block: string; leavesTotal: number; leavesActive: number; leavesRemoved: number;
+  balanceWei: string; burnedWei: string; unitWei: string; shareBps: number; depth: number;
+};
+type Row = { t: number; status: string; nullifier?: string };
+type Slash = { t: number; idCommitment: string; status: string; commit?: string; reveal?: string };
+type Feed = { serverId: string; slashing: boolean; epochSeconds: number; startedAt: number; counts: Record<string, number>; rows: Row[]; slashes: Slash[] };
+type Data = { chain: Chain | null; chainError: string | null; feed: Feed | null; feedError: string | null };
+
+const mon = (wei: string | bigint, dp = 3) => (Number(wei) / 1e18).toFixed(dp);
+const time = (ms: number) => new Date(ms).toTimeString().slice(0, 8);
+const pill = (s: string) => (s === "verified" ? "ok" : s === "violation" ? "bad" : "wait");
+const txLink = (h?: string) => (h ? <a className="mono" href={`${EXPLORER}/tx/${h}`} target="_blank" rel="noreferrer">{h.slice(0, 8)}…{h.slice(-4)}</a> : <span className="mono">—</span>);
 
 export default function Service() {
-  const [rows, setRows] = useState<Row[]>([]);
-  const [per, setPer] = useState(100);
-  const [trees, setTrees] = useState({ open: true, screened: false });
-  const [saved, setSaved] = useState(false);
-  const s = servers[0];
-  const seq = useRef(0);
+  const [d, setD] = useState<Data | null>(null);
+  const [err, setErr] = useState("");
 
   useEffect(() => {
-    const tick = () => {
-      const id = ++seq.current;
-      const bad = id % 17 === 0;
-      setRows((r) => [{ id, t: now(), nul: short(), k: bad ? 7 : Math.floor(Math.random() * 60), bad }, ...r].slice(0, 14));
+    let live = true;
+    const load = async () => {
+      try {
+        const r = await fetch("/api/service", { cache: "no-store" });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const j = (await r.json()) as Data;
+        if (live) { setD(j); setErr(""); }
+      } catch (e) {
+        if (live) setErr(e instanceof Error ? e.message : "request failed");
+      }
     };
-    tick();
-    const h = setInterval(tick, 1100);
-    return () => clearInterval(h);
+    void load();
+    const h = setInterval(load, 3000);
+    return () => { live = false; clearInterval(h); };
   }, []);
+
+  const c = d?.chain, f = d?.feed;
+  const burned = c ? BigInt(c.burnedWei) : 0n;
+  const paid = c && c.shareBps < 10000 ? (burned * BigInt(c.shareBps)) / BigInt(10000 - c.shareBps) : 0n;
+  const staked = c ? BigInt(c.balanceWei) - burned : 0n;
+  const verified = f?.counts.verified ?? 0;
+  const violations = f?.counts.violation ?? 0;
+  const rejected = f ? Object.entries(f.counts).filter(([k]) => k !== "verified").reduce((s, [, n]) => s + n, 0) : 0;
 
   return (
     <div className="wrap shell">
       <header className="shell-head">
         <div>
-          <p className="label" style={{ marginBottom: 8 }}>{s.name} · {s.kind}</p>
+          <p className="label" style={{ marginBottom: 8 }}>{f ? `${f.serverId} · MCP tool server` : "Service console"}</p>
           <h1>Service console</h1>
         </div>
-        <span className="demo-note"><i />Demo data</span>
+        <span className="demo-note">
+          <i style={{ background: c ? "var(--leaf)" : "var(--amber)" }} />
+          {c ? `Live · Monad testnet · block ${Number(c.block).toLocaleString("en-US")}` : err || d?.chainError || "Connecting…"}
+        </span>
       </header>
 
       <dl className="facts">
-        <div><dt>Requests today</dt><dd className="tnum">{(s.calls + rows.length).toLocaleString("en-US")}</dd></div>
-        <div><dt>Violations</dt><dd className="tnum">{s.violations + rows.filter((r) => r.bad).length}</dd></div>
-        <div><dt>Slash rewards</dt><dd className="tnum">3.4<small>MON</small></dd></div>
-        <div><dt>Per epoch limit</dt><dd className="tnum">{per}</dd></div>
+        <div><dt>Agents in the tree</dt><dd className="tnum">{c ? c.leavesActive : "–"}<small>{c ? `${c.leavesRemoved} removed` : ""}</small></dd></div>
+        <div><dt>Staked in the registry</dt><dd className="tnum">{c ? mon(staked, 2) : "–"}<small>MON</small></dd></div>
+        <div><dt>Verified requests</dt><dd className="tnum">{f ? verified.toLocaleString("en-US") : "–"}<small>{f ? `${rejected} rejected` : ""}</small></dd></div>
+        <div><dt>Slashed, paid out</dt><dd className="tnum">{c ? mon(paid, 3) : "–"}<small>MON</small></dd></div>
       </dl>
 
       <div className="two">
         <section className="block">
-          <header><h2 className="h3">Live requests</h2><span className="pill ok"><i />streaming</span></header>
-          <div className="feed" aria-label="Live verified requests">
-            {rows.map((r) => (
-              <div key={r.id} className={"r" + (r.bad ? " bad" : "")}>
-                <span>{r.t}</span><span>{r.nul}</span><span>k={r.k}</span>
-                <span>{r.bad ? "repeat k" : "verified"}</span>
-              </div>
-            ))}
-          </div>
-          <p className="small" style={{ marginTop: 12 }}>Rows show nullifiers, never callers. A repeated request number queues a slash.</p>
+          <header>
+            <h2 className="h3">Live requests</h2>
+            {f ? <span className="pill ok"><i />streaming</span> : <span className="pill wait"><i />demo server offline</span>}
+          </header>
+          {f ? (
+            <div className="scroll-x">
+              <table className="tbl">
+                <thead><tr><th>Time</th><th>Nullifier</th><th>Result</th></tr></thead>
+                <tbody>
+                  {f.rows.length === 0 && <tr><td colSpan={3} className="small">No requests yet. Run an agent against the server.</td></tr>}
+                  {f.rows.slice(0, 14).map((r, i) => (
+                    <tr key={`${r.t}-${i}`}>
+                      <td className="tnum">{time(r.t)}</td>
+                      <td className="mono">{r.nullifier ?? "—"}</td>
+                      <td><span className={"pill " + pill(r.status)}><i />{r.status}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="small">{d?.feedError ?? "Loading…"}. Registry data on this page is still live; request rows come from the demo server&apos;s own verifier.</p>
+          )}
+          <p className="small" style={{ marginTop: 12 }}>Rows show nullifiers, never callers. A repeated message id with a different request is a violation: the server recovers the agent&apos;s secret and starts a slash.</p>
         </section>
 
         <section className="block">
-          <header><h2 className="h3">Policy</h2></header>
-          <form onSubmit={(e) => { e.preventDefault(); setSaved(true); setTimeout(() => setSaved(false), 2200); }}>
-            <div className="field">
-              <label htmlFor="per">Requests per epoch</label>
-              <input id="per" type="number" min={1} value={per} onChange={(e) => setPer(Math.max(1, Number(e.target.value) || 1))} />
-              <span className="help">Epoch is one hour. Quotas are per server, so an agent&apos;s total exposure is this number for every server it calls.</span>
-            </div>
-            <fieldset>
-              <legend style={{ font: "700 0.875rem var(--f-sans)", marginBottom: 8 }}>Accepted trust lists</legend>
-              <label className="check"><input type="checkbox" checked={trees.open} onChange={(e) => setTrees({ ...trees, open: e.target.checked })} /><span><b>Open</b><small>Anyone who stakes. The default.</small></span></label>
-              <label className="check"><input type="checkbox" checked={trees.screened} onChange={(e) => setTrees({ ...trees, screened: e.target.checked })} /><span><b>Screened</b><small>Wallet profiled by a screener. Beta, labels only for now.</small></span></label>
-              <label className="check" style={{ opacity: 0.55 }}><input type="checkbox" disabled /><span><b>Compliant</b><small>Not available. Needs a verified-asset partner we do not have.</small></span></label>
-            </fieldset>
-            <button className="btn primary" type="submit">{saved ? "Saved" : "Save policy"}</button>
-          </form>
+          <header><h2 className="h3">This server</h2></header>
+          <dl className="kv">
+            <div><dt>Registry</dt><dd><a className="mono" href={`${EXPLORER}/address/${REGISTRY}`} target="_blank" rel="noreferrer">{REGISTRY.slice(0, 10)}…{REGISTRY.slice(-6)}</a></dd></div>
+            <div><dt>Epoch</dt><dd>{f ? `${f.epochSeconds / 60} min` : "—"}</dd></div>
+            <div><dt>Stake per message</dt><dd>{c ? `${mon(c.unitWei, 2)} MON` : "—"}</dd></div>
+            <div><dt>Slash share to the slasher</dt><dd>{c ? `${c.shareBps / 100}% (rest locked)` : "—"}</dd></div>
+            <div><dt>Slashing on this server</dt><dd>{f ? (f.slashing ? "on" : "off") : "—"}</dd></div>
+            <div><dt>Violations seen</dt><dd className="tnum">{f ? violations : "—"}</dd></div>
+          </dl>
+          <h3 className="h3" style={{ margin: "32px 0 8px" }}>Protect your own API</h3>
+          <p className="small">A service is configured in code, not here. The limit per epoch is whatever stake each agent put up; you choose a minimum by rejecting proofs from the registry you do not accept.</p>
+          <pre className="mono small" style={{ whiteSpace: "pre-wrap", margin: "8px 0 0" }}>{`app.use(quotaExpress(new QuotaVerifier({
+  serverId: "my-api",
+  vkey, roots: new RegistryRootChecker(client, REGISTRY),
+})));`}</pre>
+          <p className="small" style={{ marginTop: 8 }}>See the <a href="/docs">docs</a> for the 10-minute quickstart.</p>
         </section>
       </div>
 
       <section className="block">
-        <header><h2 className="h3">Slash history</h2><span className="small">Claims go through commit then reveal</span></header>
+        <header><h2 className="h3">Slash history</h2><span className="small">Claims go through commit then reveal (not BTX)</span></header>
         <div className="scroll-x">
           <table className="tbl">
-            <thead><tr><th>Time</th><th>Commit</th><th>Reveal</th><th className="num">To you</th><th className="num">Burned</th><th>State</th></tr></thead>
+            <thead><tr><th>Time</th><th>Agent</th><th>Commit</th><th>Reveal</th><th>State</th></tr></thead>
             <tbody>
-              {slashes.map((x) => (
-                <tr key={x.id}>
-                  <td className="tnum">{x.time}</td><td className="mono">{x.commit}</td><td className="mono">{x.reveal}</td>
-                  <td className="num">{x.reward.toFixed(1)} MON</td><td className="num">{x.burned.toFixed(1)} MON</td>
-                  <td><span className={"pill " + (x.state === "paid" ? "ok" : "wait")}><i />{x.state}</span></td>
+              {(!f || f.slashes.length === 0) && (
+                <tr><td colSpan={5} className="small">{f ? "No slashes since this server started." : "Needs the demo server feed."} Total on-chain: {c ? `${mon(paid, 3)} MON paid and ${mon(burned, 3)} MON locked` : "—"}. <a href={`${EXPLORER}/address/${REGISTRY}`} target="_blank" rel="noreferrer">Full history on the explorer</a>.</td></tr>
+              )}
+              {f?.slashes.map((x, i) => (
+                <tr key={`${x.t}-${i}`}>
+                  <td className="tnum">{time(x.t)}</td><td className="mono">{x.idCommitment}</td>
+                  <td>{txLink(x.commit)}</td><td>{txLink(x.reveal)}</td>
+                  <td><span className={"pill " + (x.status === "slashed" ? "ok" : "wait")}><i />{x.status}</span></td>
                 </tr>
               ))}
             </tbody>

@@ -282,3 +282,9 @@ dialog .actions { display: flex; gap: var(--s3); justify-content: flex-end; marg
 .docs code:not(pre code) { font-size: 0.875em; background: var(--paper); border: 1px solid var(--rule-2); padding: 1px 5px; border-radius: var(--r); color: var(--ink); }
 @media (max-width: 860px) { .docs { grid-template-columns: 1fr; gap: var(--s5); } .docs aside { position: static; display: flex; gap: var(--s4); flex-wrap: wrap; } .docs aside a { border: 0; padding: 4px 0; } }
 
+
+/* key/value list used by the live consoles */
+.kv { margin: 0; border-top: 1.5px solid var(--ink); }
+.kv > div { display: flex; justify-content: space-between; gap: var(--s4); padding: var(--s3) 0; border-bottom: 1px solid var(--rule); }
+.kv dt { font: 600 0.75rem var(--f-mono); color: var(--ink-2); }
+.kv dd { margin: 0; font-weight: 600; text-align: right; }
