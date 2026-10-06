@@ -94,6 +94,14 @@ export type VerifyResult =
         | "violation";
     };
 
+/// One verification outcome, for dashboards and logs. Carries only public values: never the proof's share or a secret.
+export interface VerifyEvent {
+  status: "verified" | Exclude<VerifyResult, { ok: true }>["reason"];
+  nullifier?: bigint; // absent when the header could not be decoded
+  epoch?: bigint;
+  at: number; // unix ms
+}
+
 export interface QuotaVerifierOptions {
   serverId: string;
   vkey: Record<string, unknown>;
@@ -104,6 +112,8 @@ export interface QuotaVerifierOptions {
   epochGrace?: number;
   now?: () => number; // unix seconds
   onViolation?: (v: Violation) => void | Promise<void>;
+  /// Called after every verification (accepted or rejected). Must not throw; errors are swallowed.
+  onResult?: (e: VerifyEvent) => void;
 }
 
 /// @quota/server verifier (PRD Z3, Z4, S2 core): checks a request's RLN proof and catches message-id reuse.
@@ -118,17 +128,32 @@ export class QuotaVerifier {
   }
 
   async verifyHeader(header: string | undefined, payloadHash: Hex): Promise<VerifyResult> {
-    if (!header) return { ok: false, reason: "malformed" };
     let p: QuotaProof;
     try {
+      if (!header) throw new Error("missing");
       p = decodeProof(header);
     } catch {
+      this.#emit("malformed");
       return { ok: false, reason: "malformed" };
     }
     return this.verify(p, payloadHash);
   }
 
   async verify(p: QuotaProof, payloadHash: Hex): Promise<VerifyResult> {
+    const r = await this.#check(p, payloadHash);
+    this.#emit(r.ok ? "verified" : r.reason, p);
+    return r;
+  }
+
+  #emit(status: VerifyEvent["status"], p?: QuotaProof) {
+    try {
+      this.o.onResult?.({ status, nullifier: p?.nullifier, epoch: p?.epoch, at: Date.now() });
+    } catch {
+      // an observer must never change the verdict
+    }
+  }
+
+  async #check(p: QuotaProof, payloadHash: Hex): Promise<VerifyResult> {
     const now = this.epoch();
     if (p.epoch > now || p.epoch < now - BigInt(this.o.epochGrace ?? 1)) return { ok: false, reason: "bad-epoch" };
     if (p.externalNullifier !== externalNullifier(this.o.serverId, p.epoch)) {
