@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export interface RlnArtifacts {
@@ -8,7 +9,9 @@ export interface RlnArtifacts {
   vkey: Record<string, unknown>;
 }
 
-const DIR = fileURLToPath(new URL("../artifacts/rln-20/", import.meta.url));
+// Plain path arithmetic (not `new URL("../artifacts/…", import.meta.url)`): bundlers such as Turbopack treat that form
+// as an asset import and fail on the directory. The result is the same absolute directory with a trailing separator.
+const DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "artifacts", "rln-20") + sep;
 
 /// Must match artifacts/rln-20/SHA256SUMS. Duplicated here so an edited SUMS file cannot bless a swapped artifact.
 export const ARTIFACT_SHA256: Record<string, string> = {

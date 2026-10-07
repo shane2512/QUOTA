@@ -1,7 +1,7 @@
 import { PrivyClient } from "@privy-io/node";
 import { toHex, type Address, type Hex, type TransactionSerializable } from "viem";
 import type { WalletAdapter } from "@quota/slasher";
-import { SECRET_MESSAGE } from "@quota/client";
+import { SECRET_MESSAGE } from "@quota/client/helpers"; // not the index: that pulls in snarkjs
 
 /// PRD W1/W2/W4: the agent's wallet is a Privy server wallet owned by the operator's Privy user. Our runtime
 /// holds an authorization key that is an *additional signer* restricted by an override policy (registry calls on
