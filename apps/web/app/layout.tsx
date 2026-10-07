@@ -3,6 +3,7 @@ import { Archivo, Inter_Tight } from "next/font/google";
 import "./globals.css";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
+import SmoothScroll from "@/components/SmoothScroll";
 
 const sans = Inter_Tight({ subsets: ["latin"], display: "swap", variable: "--f-inter" });
 const display = Archivo({ subsets: ["latin"], display: "swap", axes: ["wdth"], variable: "--f-archivo" });
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${sans.variable} ${display.variable}`}>
       <body>
+        <SmoothScroll />
         <Nav />
         <main>{children}</main>
         <Footer />

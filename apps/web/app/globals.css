@@ -112,7 +112,7 @@ p { margin: 0; text-wrap: pretty; }
 .nav li a { display: block; text-decoration: none; font-size: 0.8125rem; color: #b9bcbb; padding: 8px 16px; border-radius: 999px; transition: background-color 200ms var(--ease), color 200ms var(--ease); }
 .nav li a[aria-current="page"] { background: #ececeb; color: #121414; }
 @media (hover: hover) { .nav li a:not([aria-current]):hover { color: #fff; background: rgba(255, 255, 255, 0.07); } }
-.nav .nav-cta { --pill: #e4e6e3; --pill-ink: #121414; min-height: 44px; padding: 0 20px; }
+.nav .nav-cta { --pill: #e4e6e3; --pill-ink: #121414; min-height: 44px; padding: 0 20px; box-shadow: 0 0 0 1px rgba(10, 11, 11, 0.14), 0 8px 30px -12px rgba(0, 0, 0, 0.5); }
 @media (max-width: 860px) { .nav .nav-cta { display: none; } }
 @media (max-width: 520px) { .nav .brand span { display: none; } .nav .brand { padding: 0 12px; } .nav li a { padding: 8px 11px; } }
 
@@ -208,6 +208,9 @@ p { margin: 0; text-wrap: pretty; }
 }
 
 /* ---------- Sections ---------- */
+/* Lazy rendering: below-the-fold blocks are skipped by the browser until they approach the viewport.
+   `auto` remembers each block's real size once seen, so the scrollbar settles after the first pass. */
+.light > .sec, .closer-sec, .foot { content-visibility: auto; contain-intrinsic-size: auto 900px; }
 .sec { padding-top: var(--s10); }
 .light { padding-bottom: var(--s10); }
 .sec-head { max-width: 860px; margin-bottom: var(--s7); }

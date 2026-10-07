@@ -6,7 +6,7 @@ const TEX = "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/
 
 export function createGlobe(canvas: HTMLCanvasElement) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); // the canvas is 90vw square: fill cost, not detail, is the limit
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
   camera.position.set(0, 0, 4.55);

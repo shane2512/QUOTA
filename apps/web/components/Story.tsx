@@ -3,7 +3,10 @@ import { useLayoutEffect, useRef } from "react";
 import Link from "next/link";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import Galaxy from "./Galaxy";
+import dynamic from "next/dynamic";
+
+// the starfield (ogl + shader) loads after first paint, off the critical path
+const Galaxy = dynamic(() => import("./Galaxy"), { ssr: false });
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -78,6 +81,7 @@ export default function Story() {
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let globe: { set: (v: { dim?: number; spin?: number }) => void; resize: () => void; dispose: () => void } | null = null;
     let dead = false;
+    let tlRef: gsap.core.Timeline | null = null; // read by the late-loading globe to start in the right state
 
     const ctx = gsap.context(() => {
       const coin = q(".st-coin")[0], cyl = q(".st-cyl")[0] as HTMLElement, wall = q(".st-wall")[0] as HTMLElement;
@@ -134,8 +138,10 @@ export default function Story() {
       const tl = gsap.timeline({
         defaults: { ease: "none" },
         onUpdate: () => { paintWall(); paintCoin(); globe?.set(gl); starsOn.current = tl.time() < 4; },
-        scrollTrigger: { trigger: el, start: "top top", end: "bottom bottom", scrub: 0.8, invalidateOnRefresh: true, onRefresh: () => { layout(); paintWall(); } },
+        scrollTrigger: { trigger: el, start: "top top", end: "bottom bottom", scrub: true, // Lenis already smooths; a second scrub lag felt sticky
+          invalidateOnRefresh: true, onRefresh: () => { layout(); paintWall(); } },
       });
+      tlRef = tl;
       const hero = q(".st-hero")[0] as HTMLElement;
       tl
         // 1. copy lifts, the earth rises into frame
@@ -159,7 +165,7 @@ export default function Story() {
         .to(coin, { rotationY: -196, rotationX: 6, rotationZ: 5, duration: 1.3, ease: "power2.inOut" }, 4.5)
         .to(".st-cap--1", { autoAlpha: 0, y: -16, duration: 0.5 }, 5.6)
         // 4. the wall of requests wraps around while the coin turns edge-on again
-        .fromTo(wall, { opacity: 0, scale: 0.82 }, { opacity: 1, scale: 1, duration: 1.6, ease: "power2.out" }, 5.0)
+        .fromTo(wall, { autoAlpha: 0, scale: 0.82 }, { autoAlpha: 1, scale: 1, duration: 1.6, ease: "power2.out" }, 5.0)
         .to(cylS, { ry: -26, duration: 4.4, ease: "power1.inOut" }, 5.0)
         .fromTo(".st-cap--2", { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power2.out" }, 6.0)
         .to(coin, { rotationY: -90, rotationX: 2, rotationZ: 0, duration: 1.2, ease: "power2.inOut" }, 5.9)
@@ -183,11 +189,12 @@ export default function Story() {
       }
     }, el);
 
-    // three.js loads after first paint; the page works without it
-    import("./globe").then(({ createGlobe }) => {
+    // three.js loads once the browser is idle after first paint; the page works without it
+    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 200));
+    idle(() => import("./globe").then(({ createGlobe }) => {
       if (dead) return;
-      try { globe = createGlobe(el.querySelector(".st-globe canvas") as HTMLCanvasElement); } catch { /* no WebGL: the copy still reads */ }
-    });
+      try { globe = createGlobe(el.querySelector(".st-globe canvas") as HTMLCanvasElement); globe.set({ dim: (tlRef?.time() ?? 0) < 4.2 ? 1 : 0 }); } catch { /* no WebGL: the copy still reads */ }
+    }));
     const onResize = () => globe?.resize();
     window.addEventListener("resize", onResize);
     return () => { dead = true; window.removeEventListener("resize", onResize); ctx.revert(); globe?.dispose(); };
