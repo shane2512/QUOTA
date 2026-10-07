@@ -9,6 +9,9 @@
     "test": "pnpm --filter \"./packages/*\" --filter \"./apps/scout\" --filter \"./apps/demo-mcp\" --filter \"./apps/web\" -r test",
     "typecheck": "pnpm --filter \"./packages/*\" --filter \"./apps/demo-mcp\" --filter \"./apps/scout\" -r typecheck",
     "phase2": "pnpm --filter @quota/server phase2",
-    "phase3": "pnpm --filter @quota/devtools phase3"
+    "phase3": "pnpm --filter @quota/devtools phase3",
+    "fund": "pnpm --filter @quota/web exec tsx scripts/fund-wallet.mts",
+    "scan:secrets": "node scripts/secrets-scan.mjs",
+    "wallet-id": "pnpm --filter @quota/web exec tsx scripts/wallet-id.mts"
   }
 }
