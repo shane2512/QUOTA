@@ -100,12 +100,12 @@ Goal: kill unknowns before writing real code.
 - The README path works from the CLI with funded keys.
 
 ## Phase 8 — Hardening, media, submission (11–13 Oct)
-- [ ] Security pass: secrets scan of repo and git history, passkey checks reread, replay tests, `forge coverage` on custody and slash paths.
+- [x] Secrets scan of the tree and all commits: `pnpm scan:secrets` ALL CLEAR on 2026-10-07 (control test confirmed it catches a planted value). [x] `forge coverage` on custody and slash paths (Phase 3/4 records). [ ] Re-run on submission day.
 - [x] Threat model (`docs/threat-model.md`) + "why not roll your own" page (`docs/why-not-roll-your-own.md`), written 2026-10-06 from the code and tests.
-- [ ] **Technical demo video (≤ 3 min, live product, no slides):** enroll with passkey → Scout makes anonymous requests → violation → slash lands. Show the tx.
-- [ ] **Pitch video (≤ 2 min):** team, problem, why.
+- [ ] **Technical demo video (≤ 3 min, live product, no slides):** enroll with passkey → agent makes anonymous requests → violation → slash lands. Show the tx. Script and pre-flight: `docs/demo-video-script.md`. Record after the Chrome test (`docs/chrome-test-plan.md`).
+- [ ] **Pitch video (≤ 2 min):** team, problem, why. Script: `docs/demo-video-script.md` §B (needs team names).
 - [ ] Optional 30 s ad. Logo/graphic (JPG/PNG/WEBP ≤ 3 MB).
-- [ ] Per-bounty descriptions: how each sponsor is used (see `00-bounty-validation.md`); Dynamic/Privy/Nansen/Cleanverse/Qwen videos where optional.
+- [x] Per-bounty descriptions written (`docs/bounties.md`: Track 4, Privy, Dynamic claimed with stated limits; Qwen, Nansen, Cleanverse not claimed). [ ] Optional sponsor videos.
 - [ ] Publish the Qwen article; link it.
 - [ ] Record the integrator evidence (a PR, a running URL, or a message).
 - [ ] Submit by the evening of 13 Oct. Leave a buffer for portal problems.

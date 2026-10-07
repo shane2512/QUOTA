@@ -1,6 +1,30 @@
 # QUOTA — Handoff for the next engineer / agent
 
-You are continuing a hackathon build (Monad Metropolis, Track 4). Deadline **14 Oct 2026, 09:29 IST**; submit by the evening of 13 Oct. Repo: `github.com/shane2512/QUOTA`. Phases 0–5 are done. Phase 6 (Nansen) was **cut** (gates.md G5). Phase 7 is **partly done** (§8g): registry v3 is live on the public domain and a slash is now profitable; Scout is built and its tools are exercised live, but it hasn't run with Qwen yet; there are no consoles. **Continue at §9** (rest of Phase 7, then Phase 8). §8c–8e cover Phase 4 and §8f Phase 5.
+You are continuing a hackathon build (Monad Metropolis, Track 4). Deadline **14 Oct 2026, 09:29 IST**; submit by the evening of **13 Oct**. Repo: `github.com/shane2512/QUOTA`. Phases 0–5 are done, Phase 6 (Nansen) was **cut**, Phase 7 is **built but not yet verified in a real browser** (operator console, live service console, Scout, registry v3), and Phase 8 (hardening and submission) has started (docs written, secrets scan added). **Start with §0.**
+
+## 0. START HERE (collaborator)
+
+**Your first job, set by the owner: test every function in Chrome, then record it.** Nothing in the web app has been run with a real Privy login and a real hardware passkey yet. Follow [`chrome-test-plan.md`](chrome-test-plan.md) (73 numbered checks: public pages P, service console S, operator console O, security X, CLI C) and fill in [`chrome-test-report.md`](chrome-test-report.md). Mark PASS only for what you saw work; use BLOCKED with a reason otherwise. Passkeys work **only** on `https://quota-metro.vercel.app` (the registry's domain is permanent).
+
+Order of work:
+1. **Set up** (§7), then run the whole Chrome test plan. Fix or report every FAIL (bugs go in the report; do not change contracts or the registry address).
+2. Re-run `pnpm scan:secrets`, `pnpm test`, `cd contracts && forge test` after any change.
+3. **Record the demo video** with [`demo-video-script.md`](demo-video-script.md) once the test plan has no FAIL on P, S, O.
+4. Finish the submission with [`submission-checklist.md`](submission-checklist.md) and [`bounties.md`](bounties.md) (what we claim, and what we do not).
+5. Open owner items are in §10.
+
+**Do not use the three wallets created on 5 Oct** (`0x0cc2…4920`, `0x8F87…2576`, `0x1Ec0…1aA6`) or any identity belonging to them. They trust the old authorization key, which leaked in chat and **cannot be deleted from the Privy dashboard** (owner confirmed 2026-10-07: ignore it). Treat that key as compromised: it can still sign registry-only transactions (value ≤ its cap) for those wallets, so nothing of value may live there. The current key, quorum and policy are in `.env` and Vercel. If a script or old doc calls `0x1Ec0…` "the agent wallet", it is stale; the demo agent wallet is `0x5b76B256d34Ff567cA3Cf2514e0B618429427dA5` (`PRIVY_AGENT_WALLET_ID` in `.env`).
+
+Useful commands (repo root):
+
+| Command | What it does |
+|---|---|
+| `pnpm test` / `pnpm typecheck` | all package and web tests (real proofs); types |
+| `pnpm scan:secrets` | secrets scan of the tree and every commit (prints names only) |
+| `pnpm fund <address> [amountMon]` | send test MON from the deployer (cap 1.5 MON per call) |
+| `pnpm wallet-id <email>` | the console wallet id for a login; paste as `PRIVY_AGENT_WALLET_ID` to run the CLI agent as that operator |
+| `pnpm --filter @quota/web dev` | local web on port 3000 (needs `apps/web/.env.local`; Privy allows only port 3000 and the production domain) |
+| `pnpm --filter @quota/web exec tsx scripts/operator-e2e.mts` | live server-side check on Monad (software passkey, ~0.9 MON) |
 
 ## 1. What QUOTA is (one paragraph)
 Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An operator locks a stake (approved by a human passkey, verified on-chain via the P256 precompile at `0x100`); the agent joins a Merkle tree. Each request carries an RLN-v2 zero-knowledge proof of "I am a member and this is request k of my N this epoch". Reusing a request number leaks the agent's secret `a0` (Shamir two-point recovery); anyone with `a0` can slash the stake. No issuer. The primary output is a primitive (contracts, SDKs, middleware), not a consumer app.
@@ -13,7 +37,9 @@ Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An opera
 5. `docs/progress.md` — chronological log, decisions, open items
 6. `docs/deployments.md` — addresses and tx evidence
 7. `docs/quickstart-service.md`, `docs/quickstart-agent.md` — how the SDK is used
-8. `docs/MASTER_PROMPT.md` — the working rules (summarised below). If a doc and the prompt disagree, stop and ask the owner.
+8. `docs/chrome-test-plan.md` + `chrome-test-report.md` — **your test assignment** (§0)
+9. `docs/threat-model.md`, `docs/bounties.md`, `docs/demo-video-script.md`, `docs/submission-checklist.md` — what we claim, how we record it, how we submit
+10. `docs/MASTER_PROMPT.md` — the working rules (summarised below). If a doc and the prompt disagree, stop and ask the owner.
 
 ## 3. Rules you must keep (from the master prompt)
 - **Honesty:** never present something as working that you did not run; paste real output. Never fake a sponsor integration. State measured numbers as measured.
@@ -36,8 +62,8 @@ Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An opera
 | 4 SDKs, middleware, demo MCP | Done. Express/Hono/MCP middleware, demo MCP server live against v2, quickstarts; quickstart timing verified in 2m 27s (target ≤ 10m). **Re-verified 2026-10-05: forge 84/84, pnpm 26/26, typecheck clean, phase3 e2e 14/14 PASS on testnet. MCP live demo: 5 × OK + 1 × REJECTED (violation 429) + server-initiated on-chain slash. Windows path bug (fileURLToPath) found and fixed. Active demo agent index 5.** |
 | 5 Wallet integrations | Done. Privy agent wallet (owner + policy + additional signer) and Dynamic slasher, live on Monad incl. a slash through the demo MCP server |
 | 6 Trust tiers (Nansen) | **Cut** 2026-10-06 (owner): free tier, mainnet-only data (gates.md G5) |
-| 7 Scout, consoles, deploy | Partial (§8g): registry v3 + Sourcify, Scout (tools live with a scripted plan), README, article draft. Open: Qwen run, consoles |
-| 8 Hardening and submission | Not started |
+| 7 Scout, consoles, deploy | Built, **not verified in a real browser**: registry v3 (Sourcify `match`), live service console, operator console (Privy login, real passkey, relay; server side verified live with a software passkey), Scout (scripted plan only, no model), README with the judge path. Open: the Chrome test plan, Qwen (deferred), a reachable demo server for the feed |
+| 8 Hardening and submission | Started: threat model, why-not-roll-your-own, bounty text, video scripts, submission checklist, `scan:secrets` (clear on 2026-10-07). Open: Chrome test, videos, logo, integrator evidence |
 
 ### Scope decisions already taken
 - **BTX does not exist for us** (organizers confirmed). Slash path is **commit–reveal only**; label it as the fallback, never as BTX.
@@ -77,12 +103,15 @@ apps/scout/                        Scout (PRD D1): planner (OpenAI-compatible; Q
                                    switch_server / topup_stake, LiveQuotaAccount (Privy wallet + operator passkey); --scripted = test tooling
 README.md                          overview, live addresses, how to run, honest limits
 docs/qwen-article-draft.md         article draft; sections needing a real Qwen run are marked PENDING
-apps/web/                          Next.js landing + consoles from another contributor; "demo data", not reviewed
+apps/web/                          Next.js site: landing, docs, /demo (labelled simulation), /service (live), /operator (Privy login + real passkey),
+                                   lib/operator-server.ts + /api/operator/{me,relay}, lib/passkey-{core,browser}.ts, scripts/ (operator-e2e, fund-wallet, wallet-id)
+scripts/secrets-scan.mjs           pnpm scan:secrets
+docs/chrome-test-plan.md, chrome-test-report.md, bounties.md, demo-video-script.md, submission-checklist.md, threat-model.md, why-not-roll-your-own.md
 docs/                              PRD, phases, gates, deployments, progress
 ```
 Deployed on Monad testnet (chain 10143):
 - **Registry v3 (current):** `0xCBdfda8ebF4302793C06a402E9753C4F43799990`, rpId `quota-metro.vercel.app`, origin `https://quota-metro.vercel.app`, unit 0.1 MON, verified on Sourcify. Leaf 0 = Privy identity 0 (slashed by the v3 e2e); leaf 1 = Privy identity 1 (Active, limit 4).
-- **Wallets:** Privy agent `0x1Ec0…1aA6`; Dynamic slasher `0xe550…2b15` (new; the previous Dynamic wallet `0x7d15…Aee1` is stranded, its password lost with the old `.env`).
+- **Wallets:** demo Privy agent wallet `0x5b76…7dA5` (current key); every console user gets their own Privy server wallet; Dynamic slasher `0xe550…2b15` (the previous Dynamic wallet `0x7d15…Aee1` is stranded, its password lost). **Ignore the three 5 Oct wallets (see §0).**
 - Registry v2 (superseded): `0xd89BFd2f093015193d42EA51170D64d9242a40C6` (rpId `localhost`), holds the Phase 3–5 evidence.
 - Registry v1 (superseded): `0x05a5…0ac`, holds the Phase 1 hardware-passkey evidence.
 - Details and tx hashes: `docs/deployments.md`.
@@ -111,6 +140,15 @@ Deployed on Monad testnet (chain 10143):
 - Measured on an Apple M2 (node 26): proving median 1170 ms in one run and 705 ms in another (n=10 each); verify median 16–32 ms. Windows and browser not measured.
 
 ## 6. Gotchas that already cost time
+- **Privy allowed origins:** the dashboard allows only `https://quota-metro.vercel.app` and `http://localhost:3000`. On any other port or alias, Privy blocks its login iframe (`frame-ancestors` console error). Always run local web on port 3000.
+- **Vercel alias:** `quota-metro.vercel.app` is attached to the project as a domain, so it follows each production deploy. (An alias set by hand pins to one deployment and goes stale.) Git pushes to `main` deploy automatically; Root Directory is `apps/web`.
+- **Git Bash on Windows rewrites paths that start with `/`** (for example `vercel api /v9/...`): prefix `MSYS_NO_PATHCONV=1`.
+- **Web scripts that use top-level `await` must be `.mts`** (the web package is not `"type": "module"`).
+- **Turbopack and `@quota/core`:** `new URL("../artifacts/…", import.meta.url)` is treated as an asset import and breaks the web build; the artifact directory is built with path functions instead. The web server imports `@quota/client/helpers` (not the index) to avoid bundling snarkjs.
+- **pnpm install scripts:** `pnpm-workspace.yaml` lists `@reown/appkit`, `bufferutil`, `keccak`, `utf-8-validate` as `false` (optional native speed-ups pulled in by the Privy browser SDK). Do not set them to true without a reason.
+- **Privy and Monad are occasionally flaky:** a Privy call may fail once with an empty error; a read right after a transaction may show the old state for a few seconds. Retry once before calling it a bug. The console reads twice after each action for this reason.
+- **A registered passkey cannot be replaced** and a slashed or withdrawn identity can never re-enroll. For tests always use a fresh email/user (the e2e script does) and a fresh identity slot.
+- **Wallet policy blocks sweeps:** test MON sent to a console wallet cannot be taken back by us (the policy allows registry calls only), except stake returned by `unstake`.
 - **Back up `.env`.** It was replaced with the teammate's file, which lost the Dynamic wallet password, so a wallet with 0.129 MON is now unrecoverable. Ids are mirrored in `deployments.md`; secrets aren't anywhere else.
 - **Monad value transfers:**
   - The sender needs value + gas limit × max fee up front. Monad still *includes* an underfunded transaction, which then reverts and is charged the full gas limit. This cost two v3 enrolls; budget stake + 0.45 MON.
@@ -156,7 +194,7 @@ Deployed on Monad testnet (chain 10143):
 ## 7. Setup on a new machine
 1. Node ≥ 20, pnpm ≥ 9, Foundry (`foundryup`; 1.8.4 used). Git with submodules: `git clone --recurse-submodules` (or `git submodule update --init --recursive`).
 2. `cd contracts && forge test` — expect 84 passed.
-3. `pnpm install && pnpm typecheck && pnpm test` — expect core 12, client 3, server 9, slasher 3, wallets 3, scout 4 passed (~40 s, real proofs). `forge test`: 89. `pnpm phase2` re-runs the Phase 2 check against v1 (~4 min, event scan).
+3. `pnpm install && pnpm typecheck && pnpm test` — expect core 12, client 3, slasher 3, server 10, wallets 3, demo-mcp 2, scout 4, web 6 passed (~1 min, real proofs). `forge test`: 89. `pnpm scan:secrets`: ALL CLEAR. `pnpm phase2` re-runs the Phase 2 check against v1 (~4 min, event scan).
 4. Copy `.env.example` to `.env` (gitignored). **Do not ask for or reuse the previous owner's keys.** Generate your own throwaway deployer and slasher keys, fund them at `https://faucet.monad.xyz`, and add sponsor keys only for accounts you own. Required env names are in `docs/02-requirements-env.md` §5 (now includes `SLASHER_PRIVATE_KEY`).
 5. Public testnet RPC: `https://testnet-rpc.monad.xyz`, chain id 10143.
 6. `pnpm phase3` (= `pnpm --filter @quota/devtools phase3`) re-runs the slash e2e. It spends about 0.15 MON operator gas (mostly swept back), 0.03 stake, and ~0.28 MON slasher gas. The slasher needs ≥ 0.3 MON.
@@ -338,43 +376,25 @@ Identities already used: 0 (index 7, Active, limit 5) and 1 (index 8, Slashed). 
 - **Funding:** 5 MON moved from the old local-key slasher `0xb7B8…237f` (ours) to the deployer.
 - **Commits:** local only. Six commits ahead of `origin/main` at the end of this session (Phase 5 + Phase 7); nothing pushed.
 
-## 9. What to do next (rest of Phase 7, then Phase 8)
-1. **Qwen run** (when `QWEN_BASE_URL/QWEN_API_KEY/QWEN_MODEL` are set):
-   - Run Scout on a real research goal with both servers.
-   - Save transcripts (`apps/scout/data/`) and fill the PENDING sections of the article from them.
-   - Check that the model reads `quota_status`, spreads calls and never asks to exceed quota.
-   - Run one `--misbehave` session against the slashing server.
-2. **Consoles (needs the owner / `apps/web` contributor):**
-   - Operator console: Privy login, enroll with a *real* passkey on `quota-metro.vercel.app` (the rpId is now the public domain), stake / top-up / unstake.
-   - Service console: register server, live request/violation feed, slash history.
-   - It currently shows mock data; don't present it as live.
-3. **Phase 8:**
-   - Security pass: secrets scan of the repo **and history**; credentials pasted in chat on 2026-10-06 should be rotated.
-   - Threat model + "why not roll your own".
-   - Demo video (≤ 3 min) and pitch video (≤ 2 min).
-   - Per-bounty descriptions (Privy, Dynamic, Qwen).
-   - Submit by 13 Oct evening.
-4. **Optional:** move `requestUnstake`/`changeLimit` to the one-pass update too (gas). That needs a redeploy, so only do it if the consoles need it.
+## 9. What to do next
+See §0 for the order. In short: (1) Chrome test of every function, (2) fix what fails, (3) videos, (4) submission. Deferred by the owner: the Qwen run and article (no key), the demo server host (Render, parked). Without a reachable demo server, the deployed `/service` request feed shows "demo server offline" (chain data is still live); record the video with the local web + local demo server described in `demo-video-script.md`.
 
 ## 9b. Operator console (built 2026-10-07; real-browser test pending)
 - `apps/web/app/operator` (+ `lib/passkey-*.ts`, `lib/operator-server.ts`, `/api/operator/{me,relay}`): Privy email login, a real WebAuthn passkey, one user-owned Privy wallet per user as the on-chain operator, relay of registerPasskey / enroll / topUp / requestUnstake / unstake. The live service console is `/service` (`/api/service`); its request feed needs `FEED_URL` (a reachable demo server's `/feed`; hosting on Render is parked).
 - Verified on Monad v3 without a browser by `apps/web/scripts/operator-e2e.mts` (software passkey, throwaway Privy user, spends ~0.9 MON). **Not yet verified: a real Privy login and hardware passkey on `https://quota-metro.vercel.app/operator`.** The passkey only works on that hostname (the registry's rpId is immutable); Privy accepts only that origin and `http://localhost:3000`.
-- Vercel production variables in use: `NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_AUTH_PRIVATE_KEY`, `PRIVY_AUTH_KEY_QUORUM_ID`, `PRIVY_AGENT_POLICY_ID`. Optional: `OPERATOR_MAX_LIMIT` (default 20), `QUOTA_MAX_FEE_GWEI` (120), `MONAD_RPC_URL`, `FEED_URL`.
+- Vercel production variables in use (all six are set): `NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_AUTH_PRIVATE_KEY`, `PRIVY_AUTH_KEY_QUORUM_ID`, `PRIVY_AGENT_POLICY_ID`. Optional: `OPERATOR_MAX_LIMIT` (default 20), `QUOTA_MAX_FEE_GWEI` (120), `MONAD_RPC_URL`, `FEED_URL`.
 - Each user needs about 0.1 MON per message of limit plus ~0.45 MON of gas in their operator wallet (shown in the UI with the address and a faucet link). The wallet's policy lets our key sign only registry calls (value ≤ 1 MON), so test MON sent to it cannot be swept by us.
-- **Security follow-up for the owner:** the old key quorum is still alive and still trusted by the three 5 Oct agent wallets; delete it in the Privy dashboard (those wallets, one with 0.34 MON and an active v3 stake, then stop signing for us).
+- **Old key quorum:** still alive; the dashboard cannot delete it (owner, 2026-10-07: ignore). The three 5 Oct wallets still trust it; do not use or fund them (§0).
 
 ## 10. Open items needing the owner
-- **Qwen key** (sponsor credits) → `QWEN_BASE_URL`, `QWEN_API_KEY`, `QWEN_MODEL` in `.env`.
-- **Rotate the credentials pasted into chat on 2026-10-06:** Privy app secret + authorization key, Dynamic API token, Nansen key, Cleanverse keys. After rotating, update `.env`, and re-run `privy-policy-check` if the Privy key quorum changes.
-- **Back up `.env`**; it holds the Dynamic wallet password.
-- Consoles: OK to work in `apps/web`, or will the contributor build them on v3?
-- A named external integrator (Phase 4 item, deferred by owner).
+- **Qwen:** no key; deferred. Claim the bounty only if a real run and a published article happen (`bounties.md`).
+- **Demo server host:** Render was chosen but parked; needed for a live request feed on the deployed `/service` and for Scout/agent runs against a public server.
+- **Named external integrator with evidence** (a PR, a running URL, or a written message). The biggest gap for the traction score.
+- **Repo access** for `metropolis@hackathon.monad.xyz` (or confirm the repo is public); **community group** (or skip); **logo** (≤ 3 MB); team names for the pitch.
+- **Judge funding:** decide between "use the faucet" and pre-funded wallets (`pnpm fund`), and say so in the submission.
+- **Old credentials:** rotated; the old Privy quorum could not be deleted (ignore it, §0). Back up `.env` (it holds the Dynamic wallet password).
 - Approval before publishing packages to npm (if wanted).
-- Balances (2026-10-06): deployer 5.14 MON, Privy agent 0.34, Dynamic slasher 0.41, old local-key slasher 4.23 (funding reserve).
-- Read access for the organizers' account.
-- Community group (or skip).
-- **Push approval:** local `main` is ahead of `origin/main` (Phase 5 wallets, the Phase 6 cut, Phase 7 v3/Scout/README). Nothing is pushed.
-- The Vercel deployment `https://quota-metro.vercel.app` shows mock data; do not present it as live results.
+- Balances change; check with `pnpm fund <address> --check` (deployer about 4.2 MON on 2026-10-07).
 
 ## 11. Working-tree note
-`apps/web` belongs to another contributor (their edits are committed in `0ddd942`). Ask before touching it.
+`apps/web` is the owner's. `apps/web/tsconfig.tsbuildinfo` is a generated file that shows as modified; do not commit it. `.operator-e2e-user` (git-ignored) holds the id of the throwaway Privy user used by the e2e script; its wallet `0xcc9b…dE67` has agent 0 unstaking, withdrawable to the deployer after 2026-10-07 08:52 UTC with `relay(userId, {action:"unstake", identity:0})`.
