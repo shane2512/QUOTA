@@ -8,3 +8,4 @@ cache/
 .next/
 next-env.d.ts
 .vercel
+.operator-e2e-user
