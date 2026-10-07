@@ -23,7 +23,7 @@ Useful commands (repo root):
 | `pnpm scan:secrets` | secrets scan of the tree and every commit (prints names only) |
 | `pnpm fund <address> [amountMon]` | send test MON from the deployer (cap 1.5 MON per call) |
 | `pnpm wallet-id <email>` | the console wallet id for a login; paste as `PRIVY_AGENT_WALLET_ID` to run the CLI agent as that operator |
-| `pnpm --filter @quota/web dev` | local web on port 3000 (needs `apps/web/.env.local`; Privy allows only port 3000 and the production domain) |
+| `pnpm --filter @quota/web dev` | local web on port 3000 (reads the root `.env` through `next.config.mjs`; Privy allows only port 3000 and the production domain) |
 | `pnpm --filter @quota/web exec tsx scripts/operator-e2e.mts` | live server-side check on Monad (software passkey, ~0.9 MON) |
 
 ## 1. What QUOTA is (one paragraph)
@@ -103,7 +103,8 @@ apps/scout/                        Scout (PRD D1): planner (OpenAI-compatible; Q
                                    switch_server / topup_stake, LiveQuotaAccount (Privy wallet + operator passkey); --scripted = test tooling
 README.md                          overview, live addresses, how to run, honest limits
 docs/qwen-article-draft.md         article draft; sections needing a real Qwen run are marked PENDING
-apps/web/                          Next.js site: landing, docs, /demo (labelled simulation), /service (live), /operator (Privy login + real passkey),
+apps/web/                          Next.js site: landing (components/Story.tsx + globe.ts + Galaxy.tsx), docs, /demo (labelled simulation), /service (live),
+                                   /operator (Privy login + real passkey; logic in Operator.tsx, markup in View.tsx),
                                    lib/operator-server.ts + /api/operator/{me,relay}, lib/passkey-{core,browser}.ts, scripts/ (operator-e2e, fund-wallet, wallet-id)
 scripts/secrets-scan.mjs           pnpm scan:secrets
 docs/chrome-test-plan.md, chrome-test-report.md, bounties.md, demo-video-script.md, submission-checklist.md, threat-model.md, why-not-roll-your-own.md
@@ -385,6 +386,17 @@ See §0 for the order. In short: (1) Chrome test of every function, (2) fix what
 - Vercel production variables in use (all six are set): `NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_AUTH_PRIVATE_KEY`, `PRIVY_AUTH_KEY_QUORUM_ID`, `PRIVY_AGENT_POLICY_ID`. Optional: `OPERATOR_MAX_LIMIT` (default 20), `QUOTA_MAX_FEE_GWEI` (120), `MONAD_RPC_URL`, `FEED_URL`.
 - Each user needs about 0.1 MON per message of limit plus ~0.45 MON of gas in their operator wallet (shown in the UI with the address and a faucet link). The wallet's policy lets our key sign only registry calls (value ≤ 1 MON), so test MON sent to it cannot be swept by us.
 - **Old key quorum:** still alive; the dashboard cannot delete it (owner, 2026-10-07: ignore). The three 5 Oct wallets still trust it; do not use or fund them (§0).
+
+## 9c. Web redesign (2026-10-07; replaces the transit-signage look)
+The whole web app was restyled in one session; `DESIGN.md` is the source of truth for the new system. No contract, registry, API or passkey logic changed.
+- **Look:** near-black ground, silver ink, pill buttons, quiet panels; light paper (`.light` scope) only for the landing sections below the story. Colour carries meaning only (green verified, red slash, amber pending). Type: Inter Tight (body, via `next/font`), Archivo expanded for the landing title and the operator sign-in title, JetBrains Mono for data.
+- **Landing (`components/Story.tsx`):** one sticky, scroll-scrubbed scene (GSAP ScrollTrigger, 900vh): headline over a dim starfield (`Galaxy.tsx`, React Bits, MIT, uses the new `ogl` dependency) and a night-side earth (`globe.ts`, three.js; earth textures load at runtime from the three.js repo on jsDelivr); the earth sinks, the stake coin opens from a line of light, a curved wall of request tickets wraps around it, closing line plus CTA. Below it: four stops, comparison board, the secret-line instrument, roles, limits, code. `World.tsx` and `scene3d.ts` (the old metro flight) were deleted.
+- **Performance:** measured in headless Chrome over a full story scroll: median 16.6 ms, p95 16.9 ms per frame. Rules that keep it there: transforms and opacity only, paint work runs on the timeline's own update, no backdrop blur over WebGL, the globe and starfield stop rendering once faded or off screen, starfield at 0.6 resolution.
+- **Buttons:** header CTA "Stake an agent" (`/operator`); hero "Watch a cheater get slashed" (`/demo`) and "Read the quickstart"; story close "Stake an agent".
+- **Operator console:** redesigned sign-in page and dashboard (setup tracker, stat panels, Agents, New agent with a stake and gas breakdown, Custody). Checked with sample data only; a real Privy login has not been run on it yet (Chrome test plan O1–O32).
+- **Shared `.env`:** every app, package and script now reads the root `.env` (shell and host env still win). `apps/web/next.config.mjs` loads it and maps `QUOTA_REGISTRY_ADDRESS` and `WEBAUTHN_RP_ID` to the browser names `NEXT_PUBLIC_REGISTRY_ADDRESS` and `NEXT_PUBLIC_RP_ID` (never the RPC URL). `packages/server/scripts/phase2-exit.ts` now loads it too, so `pnpm phase2` checks the current registry from `.env` instead of its v1 fallback; set `QUOTA_REGISTRY_BLOCK` if the scan range matters. Foundry: run `forge` from the repo root with `--root contracts` to pick up the same file.
+- **Chrome test plan:** P1, P2 and O1 were rewritten for the new pages; re-run P1–P9 and O1 against the new design.
+- `moto-landing/` is the static reference prototype the design was rebuilt from (not deployed, not linked); delete it once it is no longer useful.
 
 ## 10. Open items needing the owner
 - **Qwen:** no key; deferred. Claim the bounty only if a real run and a published article happen (`bounties.md`).

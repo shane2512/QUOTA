@@ -24,8 +24,8 @@ Rules that still apply (full list in `HANDOFF.md`): never paste a secret into ch
 
 | ID | Do this | Expected |
 |---|---|---|
-| P1 | Open `/` and wait for it to load | Page loads; the 3D scene appears after a short loader; no red errors in the Console |
-| P2 | Scroll the whole landing page | Scene flies through the sections smoothly; text is readable; nothing overlaps; no layout jump at the end |
+| P1 | Open `/` and wait for it to load | Page loads; the headline "Rate limits that keep no record" rises in over a dim starfield, and the night-side earth (with three status pills) rises from the bottom; no red errors in the Console |
+| P2 | Scroll the whole landing page | In order: the headline lifts away, the earth sinks into the dark, a line of light opens into the stake coin (back shows the secret line, front shows the QUOTA mark), a curved wall of request tickets wraps around it, then "One deposit. No record of who called." Smooth (no stutter), text readable, coin engraving sharp on both faces; then the light sections and footer with no layout jump |
 | P3 | Click every item in the top navigation (Demo, Docs, Operator, Service) and the footer links | Each goes to the right page; none 404; the active nav item is highlighted |
 | P4 | Landing page text: read every claim | No claim that BTX is live (it says commit–reveal), no "audited", no "mainnet". Anything illustrative is labelled |
 | P5 | `/docs` | Content loads; the BTX row says unavailable; links work |
@@ -54,7 +54,7 @@ Run this section on the production URL, in a normal window first, then repeat a 
 
 | ID | Do this | Expected |
 |---|---|---|
-| O1 | Open `/operator` logged out | Heading "Your agents", a "Log in to stake for an agent" block, a "Log in with email" button, and the pill "Live · Monad testnet". No wallet data |
+| O1 | Open `/operator` logged out | Heading "Stake for your agents", a three-step list (Log in, Register a passkey, Enroll an agent), a "Log in with email" button and an "Agent quickstart" link. No wallet data. After login: heading "Your agents", a setup tracker until the first agent is active, four stat panels, then the Agents, New agent and Custody panels |
 | O2 | Click "Log in with email", enter email A | Privy dialog opens; it emails a code |
 | O3 | Enter a **wrong** code | Privy shows an error; you stay logged out |
 | O4 | Enter the right code | The page switches to the logged-in view within a few seconds; your email and a short wallet address appear in the header; a table of 6 agent slots, all "free" |
