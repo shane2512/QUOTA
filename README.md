@@ -16,7 +16,8 @@ Plain-language overview: [`docs/concept.md`](docs/concept.md) · requirements: [
 | What | Where |
 |---|---|
 | `QuotaRegistry` v3 (current) | [`0xCBdfda8ebF4302793C06a402E9753C4F43799990`](https://testnet.monadvision.com/address/0xCBdfda8ebF4302793C06a402E9753C4F43799990), source verified on Sourcify. Passkey domain `quota-metro.vercel.app`; 0.1 MON stake per message per epoch; 50% of a slashed stake to the slasher, the rest burned |
-| Agent wallet (Privy) | `0x1Ec0d0992990008Bcf1555FFd809Ca78aE651aA6`. Owned by the operator's Privy user; our runtime key may only call the registry, on this chain, up to 1 MON, and sign the agent-secret message |
+| Operator and agent wallets (Privy) | Every console user gets a Privy server wallet owned by their login. Demo agent wallet: `0x5b76B256d34Ff567cA3Cf2514e0B618429427dA5`. Our runtime key may only call the registry, on this chain, up to 1 MON, and sign the agent-secret message |
+| Live consoles | Operator console [quota-metro.vercel.app/operator](https://quota-metro.vercel.app/operator) (login, real passkey, enroll / add stake / unstake / withdraw) · service console [/service](https://quota-metro.vercel.app/service) (live registry state; request feed when a demo server is connected) |
 | Slasher wallet (Dynamic) | `0xe5505A02A68Ff02D55b90e8D8D179b5e2EBd2b15`. Server wallet; its key share is backed up to Dynamic, and no share is held locally |
 | End-to-end evidence | Enroll → proofs → cheat → slash, with transaction hashes: [`docs/deployments.md`](docs/deployments.md) |
 
@@ -32,8 +33,23 @@ packages/wallets    Privy agent wallet + policy, Dynamic service wallet
 packages/devtools   TEST TOOLING (software passkey, scripted enrollment, Phase 3 e2e)
 apps/demo-mcp       reference MCP server (live Wikipedia tools) behind QUOTA, plus a demo agent with --cheat
 apps/scout          Scout: LLM research agent that budgets its anonymous quota across servers
-apps/web            landing / consoles (separate contributor; shows demo data)
+apps/web            site: landing, docs, live service console, operator console (Privy login + real WebAuthn passkey), relay API
 ```
+
+## Try it in the browser (about 5 minutes)
+
+Use **Chrome or Edge** on a device with a passkey (Windows Hello, Touch ID, or your phone) at **https://quota-metro.vercel.app/operator**. Passkeys are tied to that exact address and will not work from another URL.
+
+1. **Log in** with any email (you get a one-time code). This creates your operator wallet, a Privy server wallet that only you own.
+2. **Fund it.** The console shows the wallet address and what you need (about 0.1 MON of stake per request of limit, plus about 0.45 MON of gas). Get test MON from the [Monad faucet](https://faucet.monad.xyz), or send us the address and we will fund it.
+3. **Create your passkey and register it** (two prompts: create, then sign). From now on this passkey must approve every enrollment and unstake on-chain.
+4. **Enroll an agent** with a limit of 1 (stake 0.1 MON). It appears in the table as `active`.
+5. **Add stake**, then **Unstake**: the passkey signs the withdrawal address, the agent leaves the tree at once, and the deposit unlocks after the delay (2 hours), when **Withdraw** becomes available.
+6. Open [/service](https://quota-metro.vercel.app/service): the agent count and staked total are read live from the registry.
+
+What a judge cannot click through in the browser: an agent making anonymous requests and a cheater being slashed. Those need the demo servers and agent from the CLI section below (funded keys), and they are shown in the technical demo video. The console also does not raise a limit after enrollment.
+
+For operators of the repo: `pnpm fund <address> [amountMon]` sends test MON from the deployer (capped at 1.5 MON per call).
 
 ## Run it
 
@@ -76,4 +92,5 @@ pnpm --filter @quota/demo-mcp agent --identity 2 --cheat "one call too many"
   - Cleanverse (gated docs) and Nansen (free tier, and it only indexes Monad mainnet; `gates.md` G5) are cut.
   - Dynamic delegated access is untested.
   - The Qwen model key is pending.
-  - The operator passkey in scripts is a software stand-in (labelled test tooling). A real hardware passkey was verified on-chain in Phase 1.
+  - The operator passkey in the CLI scripts and in Scout is a software stand-in (labelled test tooling), so nobody approves those steps. The operator console uses a real WebAuthn passkey.
+  - Passkeys only work at `quota-metro.vercel.app` (the registry's domain is permanent).
