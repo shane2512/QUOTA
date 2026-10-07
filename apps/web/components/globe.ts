@@ -52,7 +52,7 @@ export function createGlobe(canvas: HTMLCanvasElement) {
         vec3 night = pow(lit, vec3(1.15)) * 3.2 * vec3(1.0,.84,.58) + nt * vec3(.03,.035,.06);
         vec3 col = mix(vec3(.018,.026,.05) + day * .05 + night * (1.0 - dayAmt), day, dayAmt);
         float fres = pow(1.0 - max(dot(n, vec3(0,0,1)), 0.0), 2.6);
-        col += vec3(.42,.58,1.0) * fres * (.22 + .8 * smoothstep(-.3,.7,l));
+        col += vec3(.42,.58,1.0) * fres * (.08 + .34 * smoothstep(-.3,.7,l)); // a thin limb, not a halo
         gl_FragColor = vec4(col * dim, dim);
       }`,
   });
@@ -66,13 +66,13 @@ export function createGlobe(canvas: HTMLCanvasElement) {
     vertexShader: `varying vec3 vN; void main(){ vN = normalize(normalMatrix*normal); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
     fragmentShader: `uniform vec3 sunDir; uniform float dim; varying vec3 vN;
       void main(){
-        float i = pow(clamp(.72 - dot(normalize(vN), vec3(0,0,1)), 0., 1.), 2.4);
+        float i = pow(clamp(.72 - dot(normalize(vN), vec3(0,0,1)), 0., 1.), 3.2);
         float lit = .45 + .9 * smoothstep(-.3,.8, dot(normalize(vN), sunDir));
-        gl_FragColor = vec4(vec3(.55,.68,1.0) * i * lit * 1.05 * dim, 1.0);
+        gl_FragColor = vec4(vec3(.55,.68,1.0) * i * lit * 0.42 * dim, 1.0);
       }`,
     side: THREE.BackSide, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
   });
-  const atmoGeo = new THREE.SphereGeometry(1.075, 64, 64);
+  const atmoGeo = new THREE.SphereGeometry(1.035, 64, 64);
   scene.add(new THREE.Mesh(atmoGeo, atmoMat));
 
   let dim = 1, spin = 0, visible = true, raf = 0, running = false;
