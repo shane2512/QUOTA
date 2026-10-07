@@ -1,12 +1,18 @@
 "use client";
 import { useLayoutEffect, useRef } from "react";
+import { preload } from "react-dom";
 import Link from "next/link";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import dynamic from "next/dynamic";
+import { EARTH } from "./earth";
 
 // the starfield (ogl + shader) loads after first paint, off the critical path
 const Galaxy = dynamic(() => import("./Galaxy"), { ssr: false });
+
+// The earth starts loading with the page: three.js begins downloading as soon as this module runs in the browser
+// (in parallel with hydration), and the textures are preloaded from the document head (see Story below).
+const globeModule = typeof window !== "undefined" ? import("./globe") : null;
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -71,6 +77,10 @@ function CoinArt({ side }: { side: "front" | "back" }) {
 }
 
 export default function Story() {
+  // emitted into <head> during server render: the browser fetches the earth with the HTML, before any JS runs.
+  // "fetch" + anonymous matches how ImageBitmapLoader requests them, so the preloaded response is reused.
+  Object.values(EARTH.low).forEach((href) => preload(href, { as: "fetch", crossOrigin: "anonymous", fetchPriority: "high" }));
+  Object.values(EARTH.high).forEach((href) => preload(href, { as: "fetch", crossOrigin: "anonymous" }));
   const root = useRef<HTMLDivElement>(null);
   const starsOn = useRef(true); // the starfield stops drawing once it has faded out
 
@@ -189,12 +199,11 @@ export default function Story() {
       }
     }, el);
 
-    // three.js loads once the browser is idle after first paint; the page works without it
-    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 200));
-    idle(() => import("./globe").then(({ createGlobe }) => {
+    // the globe module was requested at page start; create it the moment it lands. The page works without it.
+    void (globeModule ?? import("./globe")).then(({ createGlobe }) => {
       if (dead) return;
       try { globe = createGlobe(el.querySelector(".st-globe canvas") as HTMLCanvasElement); globe.set({ dim: (tlRef?.time() ?? 0) < 4.2 ? 1 : 0 }); } catch { /* no WebGL: the copy still reads */ }
-    }));
+    });
     const onResize = () => globe?.resize();
     window.addEventListener("resize", onResize);
     return () => { dead = true; window.removeEventListener("resize", onResize); ctx.revert(); globe?.dispose(); };

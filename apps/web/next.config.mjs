@@ -13,6 +13,8 @@ const pub = {
 // The workspace packages are TypeScript source (no build step), so Next must compile them.
 export default {
   reactStrictMode: true,
+  // versioned earth textures never change in place: let browsers and Vercel's edge keep them for a year
+  headers: async () => [{ source: "/earth/:file*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] }],
   env: Object.fromEntries(Object.entries(pub).filter(([, v]) => v)),
   transpilePackages: ["@quota/core", "@quota/client", "@quota/slasher", "@quota/wallets"],
 };

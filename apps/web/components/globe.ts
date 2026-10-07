@@ -1,8 +1,19 @@
 import * as THREE from "three";
+import { EARTH } from "./earth";
 
 /* Night-side earth for the landing story: city lights, a lit cap from a sun above and behind, and a rim of atmosphere.
    Renders only while it is on screen and not fully dimmed, at a capped pixel ratio, so it stays cheap. */
-const TEX = "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/";
+/* ImageBitmapLoader decodes off the main thread, so the swap to 4k does not stall scrolling. */
+function loadTexture(url: string, anisotropy: number) {
+  return new Promise<THREE.Texture>((resolve, reject) => {
+    new THREE.ImageBitmapLoader().setOptions({ imageOrientation: "flipY" }).load(url, (bitmap) => {
+      const t = new THREE.Texture(bitmap as unknown as HTMLImageElement);
+      t.anisotropy = anisotropy;
+      t.needsUpdate = true;
+      resolve(t);
+    }, undefined, reject);
+  });
+}
 
 export function createGlobe(canvas: HTMLCanvasElement) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
@@ -11,16 +22,23 @@ export function createGlobe(canvas: HTMLCanvasElement) {
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
   camera.position.set(0, 0, 4.55);
 
-  const loader = new THREE.TextureLoader();
-  let loaded = 0;
-  const onTex = () => { loaded++; draw(); sync(); }; // fires after load, once sync below exists
-  const dayTex = loader.load(TEX + "earth_atmos_2048.jpg", onTex);
-  const nightTex = loader.load(TEX + "earth_lights_2048.png", onTex);
-  dayTex.anisotropy = nightTex.anisotropy = 4;
+  const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  let loaded = 0, disposed = false;
+  let dayTex: THREE.Texture | null = null, nightTex: THREE.Texture | null = null;
+  const use = (day: THREE.Texture, night: THREE.Texture) => {
+    if (disposed) { day.dispose(); night.dispose(); return; }
+    dayTex?.dispose(); nightTex?.dispose();
+    dayTex = day; nightTex = night;
+    earthMat.uniforms.dayTex.value = day; earthMat.uniforms.nightTex.value = night;
+    loaded = 2; draw(); sync();
+  };
+  const pair = (p: { day: string; night: string }) => Promise.all([loadTexture(p.day, aniso), loadTexture(p.night, aniso)]);
+  const lowReady = pair(EARTH.low);
+  const highReady = pair(EARTH.high); // both requests start now; the low pair just lands first
 
   const sunDir = new THREE.Vector3(0.1, 0.62, -0.78).normalize();
   const earthMat = new THREE.ShaderMaterial({
-    uniforms: { dayTex: { value: dayTex }, nightTex: { value: nightTex }, sunDir: { value: sunDir }, dim: { value: 1 } },
+    uniforms: { dayTex: { value: null as THREE.Texture | null }, nightTex: { value: null as THREE.Texture | null }, sunDir: { value: sunDir }, dim: { value: 1 } },
     vertexShader: `varying vec2 vUv; varying vec3 vN;
       void main(){ vUv = uv; vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
     fragmentShader: `uniform sampler2D dayTex, nightTex; uniform vec3 sunDir; uniform float dim; varying vec2 vUv; varying vec3 vN;
@@ -29,7 +47,9 @@ export function createGlobe(canvas: HTMLCanvasElement) {
         float dayAmt = smoothstep(0.02, 0.5, l);
         vec3 day = texture2D(dayTex, vUv).rgb; float g = dot(day, vec3(.3,.59,.11));
         day = mix(vec3(g), day, .3) * vec3(.74,.83,1.0) * 1.15;
-        vec3 night = pow(texture2D(nightTex, vUv).rgb, vec3(1.15)) * vec3(1.0,.86,.62) * 1.9;
+        vec3 nt = texture2D(nightTex, vUv).rgb; // Black Marble: city lights over faintly lit land
+        vec3 lit = clamp((nt - .14) / .62, 0., 1.); // only city lights clear the threshold; faint land stays dark
+        vec3 night = pow(lit, vec3(1.15)) * 3.2 * vec3(1.0,.84,.58) + nt * vec3(.03,.035,.06);
         vec3 col = mix(vec3(.018,.026,.05) + day * .05 + night * (1.0 - dayAmt), day, dayAmt);
         float fres = pow(1.0 - max(dot(n, vec3(0,0,1)), 0.0), 2.6);
         col += vec3(.42,.58,1.0) * fres * (.22 + .8 * smoothstep(-.3,.7,l));
@@ -56,6 +76,9 @@ export function createGlobe(canvas: HTMLCanvasElement) {
   scene.add(new THREE.Mesh(atmoGeo, atmoMat));
 
   let dim = 1, spin = 0, visible = true, raf = 0, running = false;
+  let high = false;
+  lowReady.then(([d, n]) => { if (!high) use(d, n); else { d.dispose(); n.dispose(); } }).catch(() => {});
+  highReady.then(([d, n]) => { high = true; use(d, n); }).catch(() => {}); // keep the low pair if the full one fails
   const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const t0 = performance.now();
   function draw() {
@@ -92,7 +115,7 @@ export function createGlobe(canvas: HTMLCanvasElement) {
       running = false; cancelAnimationFrame(raf); io.disconnect();
       document.removeEventListener("visibilitychange", sync);
       [earthGeo, atmoGeo].forEach((g) => g.dispose()); [earthMat, atmoMat].forEach((m) => m.dispose());
-      dayTex.dispose(); nightTex.dispose(); renderer.dispose();
+      disposed = true; dayTex?.dispose(); nightTex?.dispose(); renderer.dispose();
     },
   };
 }
