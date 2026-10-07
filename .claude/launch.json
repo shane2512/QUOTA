@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@quota/web", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "moto-landing",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "5178", "--directory", "moto-landing"],
+      "port": 5178
+    }
+  ]
+}
