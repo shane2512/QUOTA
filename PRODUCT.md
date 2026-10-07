@@ -11,7 +11,7 @@ QUOTA: anonymous, deposit-backed rate limits for AI-agent traffic on Monad. A pr
 Plain, concrete, honest about limits. No hype verbs. State what is confirmed vs deferred (BTX unavailable, Cleanverse dropped, Qwen deferred, Dynamic partial).
 
 ## Brand commitments
-- Transit-signage world: the product's journey is a metro line (Stake, Prove, Check, Slash). Cool concrete ground, ink, cobalt line, signal red for slashing, green for verified.
+- Night-side world: a dark cinematic landing (earth, stake coin, wall of unlinkable requests) and a four-stop journey (Stake, Prove, Check, Slash). Silver ink on near-black, signal red for slashing, green for verified.
 - Demo data is always labelled synthetic until the backend lands.
 
 ## Assumptions (inferred, no interview)

@@ -1,21 +1,22 @@
-# Design system: QUOTA (platform signage)
+# Design system: QUOTA (night side)
 
 ## Atmosphere
-Daylight transit wayfinding. Light cool concrete ground, hard ink rules, one thick line colour. Sharp 2px corners; circles only for stations and status. Motion is a camera, not decoration.
+Cinematic and quiet. A near-black ground, silver ink, one night-side earth. Pill controls, soft 12px panels. Motion is a camera, not decoration. The landing story is dark; the editorial sections after it sit on light paper; consoles, demo and docs are dark.
 
 ## Colour
-- Ground #e5e9ed, paper #f3f5f7, ink #0d1217, ink-2 #46515c, rule #c2c9d1
-- Cobalt #1b4fd8 (the line, primary actions), Signal #e8441f / text #b82d0c (slash, violation only), Leaf #0f9d6b / text #0a6f4c (verified only), Amber #f0ad1b (deposit, pending)
-- Dark surfaces (#0d1217) used for the departures board, code, and the verified readout only; the page itself never inverts.
+- Dark ground #0a0b0b, panel #121415, ink #ececeb, ink-2 #a5a9a8, ink-3 #737877, rule #26292b
+- Light paper (`.light` scope re-maps the same tokens): ground #e5e8e6, ink #121414, rule #c3c8c6
+- Colour only carries meaning: Leaf #3fd39a verified, Signal #ff6a45 slash / violation, Amber #f2b632 pending, soft cobalt #9db6ff for links and focus
+- The departures board and code blocks stay dark on either ground.
 
 ## Type
-Archivo Variable (wdth axis): display 800 at 112% width, tracking -0.035em, max 5.6rem; body 100% width. JetBrains Mono Variable for hashes, code, readouts only.
+Inter Tight (next/font): display and section heads uppercase, weight 500, tracking -0.015em, line-height 0.98. Body 400. JetBrains Mono Variable for hashes, labels, code and readouts only.
 
 ## Components
-Buttons: 48px, 1.5px ink border, cobalt fill for primary, -1px press. Tables: mono 12px headers, rule dividers, no cards. Pills: mono, semantic dot. Ticks: segmented quota strips (no filled tracks).
+Buttons are pills: primary is the bright pill (light on dark, ink on paper), secondary is a dark pill. Nav is three floating solid pieces (mark, link capsule, primary CTA). Stats sit in quiet panels; tables use mono uppercase headers and hairline rules. Status pills carry a semantic dot.
 
 ## Motion
-One authored moment: the landing camera (GSAP ScrollTrigger scrub, pin, 9 viewports) flying overview, dive, pull up, hop, dive along a code-drawn metro line. Section reveals once, expo-out, from visible default. Reduced motion: linear scrub, no zoom-out dip, no reveals.
+One authored moment: the landing story (GSAP ScrollTrigger, scrub 0.8, 9 viewports, sticky stage). Earth rises under the headline, sinks into the dark; the stake coin appears edge-on as a line of light, turns to show the secret line, then the mark, while a wall of anonymous request tickets wraps around it. Transforms and opacity only; paint work runs on the timeline update; the globe renders only while visible. Reduced motion: no intro, no float, no pointer tilt.
 
 ## Do not
-Eyebrow labels, section numbers, gradient text, glows, card grids, scroll cues, em dashes.
+Glows on UI chrome, gradient text, card grids for marketing copy, scroll cues, em dashes, backdrop blur over the WebGL canvas.

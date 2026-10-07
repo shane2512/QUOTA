@@ -6,8 +6,11 @@ export default function OperatorPage() {
   if (!appId) {
     return (
       <div className="wrap shell">
-        <h1>Operator console</h1>
-        <p className="small" style={{ marginTop: 12 }}>Login is not configured on this deployment (no Privy app ID).</p>
+        <header className="shell-head">
+          <div><p className="label" style={{ marginBottom: 8 }}>Operator</p><h1>Your agents</h1></div>
+          <span className="demo-note"><i />Login not configured</span>
+        </header>
+        <p className="empty" style={{ marginTop: 32 }}>Login is not configured on this deployment (no Privy app ID). Set NEXT_PUBLIC_PRIVY_APP_ID to stake for an agent from here.</p>
       </div>
     );
   }

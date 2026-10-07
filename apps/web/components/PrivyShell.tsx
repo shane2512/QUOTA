@@ -10,7 +10,7 @@ export default function PrivyShell({ appId, children }: { appId: string; childre
       config={{
         loginMethods: ["email"],
         embeddedWallets: { ethereum: { createOnLogin: "off" } },
-        appearance: { theme: "light" },
+        appearance: { theme: "dark", accentColor: "#e4e6e3" },
       }}
     >
       {children}

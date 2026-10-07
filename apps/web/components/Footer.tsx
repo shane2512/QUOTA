@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { Roundel } from "./Nav";
+import { Mark } from "./Nav";
 
 export default function Footer() {
   return (
     <footer className="foot">
-      <div className="wrap">
+      <div className="wrap foot-grid">
         <div>
-          <Link href="/" className="brand"><Roundel /> QUOTA</Link>
-          <p className="small" style={{ marginTop: 12, maxWidth: "38ch" }}>
+          <Link href="/" className="brand"><Mark /><span>QUOTA</span></Link>
+          <p className="small" style={{ marginTop: 16, maxWidth: "38ch" }}>
             Anonymous, deposit-backed rate limits for AI agents. Built for Monad Metropolis, Trust, Identity &amp; AI Infrastructure.
           </p>
         </div>
@@ -25,6 +25,7 @@ export default function Footer() {
           <Link href="/docs#status">Integration status</Link>
         </div>
       </div>
+      <div className="wrap foot-word" aria-hidden="true">QUOTA</div>
     </footer>
   );
 }
