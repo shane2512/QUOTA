@@ -14,7 +14,7 @@ Record results in [`chrome-test-report.md`](chrome-test-report.md) (one row per 
 | Test MON | Faucet `https://faucet.monad.xyz`, or ask the owner to run `pnpm fund <address>`. Each enrollment needs about 0.1 MON per request of limit plus about 0.45 MON of gas |
 | Explorer | `https://testnet.monadvision.com` (open each transaction the console links to and confirm "success") |
 | Repo | `git clone --recurse-submodules`, `pnpm install`, a `.env` with your own throwaway keys (copy `.env.example`; do not reuse anyone else's). The CLI section needs it |
-| Local web (for S5, O31) | `next dev` does not read the root `.env`. Create `apps/web/.env.local` (git-ignored) with `NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_AUTH_PRIVATE_KEY`, `PRIVY_AUTH_KEY_QUORUM_ID`, `PRIVY_AGENT_POLICY_ID` (and `FEED_URL` for S5), then `pnpm --filter @quota/web dev`. It must run on **port 3000**: Privy only allows `https://quota-metro.vercel.app` and `http://localhost:3000` |
+| Local web (for S5, O31) | The web app reads the root `.env` (through `apps/web/next.config.mjs`); it needs `NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_AUTH_PRIVATE_KEY`, `PRIVY_AUTH_KEY_QUORUM_ID`, `PRIVY_AGENT_POLICY_ID` there (and `FEED_URL` for S5). Run `pnpm --filter @quota/web dev`. It must run on **port 3000**: Privy only allows `https://quota-metro.vercel.app` and `http://localhost:3000` |
 
 **Do not use the three wallets created on 5 Oct** (`0x0cc2…4920`, `0x8F87…2576`, `0x1Ec0…1aA6`) or any identity that belongs to them. They trust the old authorization key, which was exposed in chat and **cannot be deleted from the dashboard**. Treat that key as compromised: it can still sign registry-only transactions (value ≤ its policy cap) for those wallets, so nothing of value may live there. The current key, quorum and policy are in `.env` / Vercel. If you ever see `0x1Ec0…` in a script or doc as "the agent wallet", it is stale.
 
@@ -41,7 +41,7 @@ Rules that still apply (full list in `HANDOFF.md`): never paste a secret into ch
 | S1 | Open `/service` | The top-right pill says "Live · Monad testnet · block N" and N grows every few seconds; no error pill |
 | S2 | Compare the four numbers with the chain. On the explorer open the registry `0xCBdfda8ebF4302793C06a402E9753C4F43799990` | "Agents in the tree" = non-removed leaves; "Staked in the registry" = contract balance minus locked burn; "Slashed, paid out" = reward share of the burn; they should be consistent with `docs/deployments.md` (burn 0.25 MON from the earlier slash) |
 | S3 | Watch DevTools Network for `/api/service` | One request about every 3 s, status 200, JSON with `chain` filled in |
-| S4 | With **no** demo server connected (production default) | "Live requests" shows the pill "demo server offline" and a sentence explaining why; the slash history table says no slashes since the server started and links to the explorer. Chain facts are still live |
+| S4 | With **no** demo server connected (production default) | While the first load runs, the four numbers show grey loading bars and the pill says "connecting". Then "Live requests" shows the pill "demo server offline" and a dashed box "The request feed is offline" with the reason and the command to run a demo server; the slash history table links to the explorer. Chain facts are still live |
 | S5 | **Local feed test** (needs the repo): run a demo server `PORT=8787 QUOTA_SERVER_ID=demo-search.quota pnpm --filter @quota/demo-mcp start`, then `FEED_URL=http://localhost:8787/feed pnpm --filter @quota/web dev` and open `http://localhost:3000/service` | The pill turns "streaming". Run the demo agent (C9): rows appear with short nullifiers and "verified". With `--cheat` a "violation" row (red) appears and, if slashing is on, a slash row with commit and reveal links |
 | S6 | Stop the demo server while the page is open | Within a few seconds the feed switches back to "demo server offline"; the page does not crash; chain data stays live |
 | S7 | Open `/api/service` directly in a tab | JSON, no secrets (only counts, short nullifiers, statuses, tx hashes) |
@@ -57,7 +57,7 @@ Run this section on the production URL, in a normal window first, then repeat a 
 | O1 | Open `/operator` logged out | Heading "Stake for your agents", a three-step list (Log in, Register a passkey, Enroll an agent), a "Log in with email" button and an "Agent quickstart" link. No wallet data. After login: heading "Your agents", a setup tracker until the first agent is active, four stat panels, then the Agents, New agent and Custody panels |
 | O2 | Click "Log in with email", enter email A | Privy dialog opens; it emails a code |
 | O3 | Enter a **wrong** code | Privy shows an error; you stay logged out |
-| O4 | Enter the right code | The page switches to the logged-in view within a few seconds; your email and a short wallet address appear in the header; a table of 6 agent slots, all "free" |
+| O4 | Enter the right code | The page switches to the logged-in view within a few seconds (grey loading panels first); your email and a short wallet address appear in the header; a setup tracker (Fund the wallet, Register a passkey, Enroll an agent); "Active agents 0 of 6 slots"; the Agents panel says "No agents yet" |
 | O5 | Note the wallet address (full address is in the funding box when your balance is low). Log out (button top right), log back in with email A | **Same wallet address** as before |
 | O6 | Log in with email B (separate Incognito window) | A **different** wallet address; its own empty slots |
 | O7 | Refresh the page while logged in | You stay logged in and the data reloads; no flash of the logged-out view that sticks |
@@ -67,9 +67,9 @@ Run this section on the production URL, in a normal window first, then repeat a 
 
 | ID | Do this | Expected |
 |---|---|---|
-| O9 | With a balance of 0, look at the "Create an agent" panel | A yellow box says the wallet needs about N MON, with the faucet link, the full address, and a "Copy address" button; the Enroll button is disabled |
-| O10 | Click "Copy address", paste it somewhere | The pasted text is exactly the wallet address; the button says "Copied" briefly |
-| O11 | Fund the wallet (faucet, or `pnpm fund <address> 0.8`), wait about 30 s, reload | "Wallet balance" shows the new amount; the yellow box disappears once the balance covers the stake plus gas |
+| O9 | With a balance of 0, look at the "New agent" panel | Rows Stake / Gas reserve / Needed in wallet; a box says the wallet has 0.000 MON, with the faucet link, the full address and a "Copy" button; the Enroll button is disabled |
+| O10 | Click "Copy", paste it somewhere | The pasted text is exactly the wallet address; the button says "Copied" briefly |
+| O11 | Fund the wallet (faucet, or `pnpm fund <address> 0.8`), wait about 30 s, reload | "Wallet balance" shows the new amount; the funding box disappears once the balance covers the stake plus gas; the tracker marks "Fund the wallet" done |
 
 ### Passkey
 
@@ -78,7 +78,7 @@ Run this section on the production URL, in a normal window first, then repeat a 
 | O12 | Before registering: look at Custody | "Passkey: not yet" in the top numbers; a button "Create passkey and register" |
 | O13 | Click it, then **cancel** the first system prompt | A red message appears (cancelled); nothing changed on the page or on-chain; you can click again |
 | O14 | Click it again; approve the first prompt (create), **cancel the second** (sign) | An error; the passkey is **not** registered on-chain (check "Passkey: not yet" after refresh). You can retry from the start |
-| O15 | Click it and approve both prompts | A green "Register passkey: confirmed" line with a "View transaction" link; after a few seconds "Passkey: registered" and the Custody box shows "approvals so far: 1". The explorer transaction is "success" |
+| O15 | Click it and approve both prompts | A green "Register passkey: confirmed" line with a "View transaction" link; after a few seconds "Passkey: Registered", the Custody pill "passkey on" and "1 approval so far · this device". The explorer transaction is "success" |
 | O16 | Open the transaction on the explorer; confirm it called `registerPasskey` on the registry | Yes |
 | O17 | Try "Create passkey and register" again (button should be gone) | Not available once registered (a registered passkey cannot be replaced) |
 
@@ -86,10 +86,10 @@ Run this section on the production URL, in a normal window first, then repeat a 
 
 | ID | Do this | Expected |
 |---|---|---|
-| O18 | In "Requests per epoch" enter 0, -1, 1.5, 999, abc | The value is clamped to a whole number from 1 to the shown maximum (20); the "Stake required" text updates (limit × 0.1 MON) |
+| O18 | In "Requests per epoch" use the − and + buttons, then type 0, -1, 1.5, 999, abc | The value is clamped to a whole number from 1 to the shown maximum (20); − is disabled at 1 and + at 20; the Stake row updates (limit × 0.1 MON) and "Needed in wallet" = stake + about 0.45 MON |
 | O19 | With limit 1 and enough balance: click "Enroll agent 0 with passkey" | One passkey prompt. Then a green "Enroll agent 0: confirmed" with a tx link; within about 5 s the table shows Agent 0 `active`, limit 1, stake 0.10 MON; "Staked" and "Active agents" numbers update |
 | O20 | Enroll again | Uses the next free slot (agent 1); the previous agent is unchanged |
-| O21 | With a balance **below** the needed amount | The Enroll button is disabled and the yellow box shows the shortfall |
+| O21 | With a balance **below** the needed amount | The Enroll button is disabled and the funding box shows the current balance |
 | O22 | Click "Add 0.1 MON" on an active agent | No passkey prompt (adding stake needs none); tx confirmed; stake rises by 0.1 |
 | O23 | In "Withdrawal address" type garbage, then click Unstake | Error that the address is bad (nothing signed on-chain). Fix the address (default is your wallet) |
 | O24 | Click "Unstake" on an active agent | One passkey prompt; confirmed; the agent becomes `unstaking` and shows "unlocks <date and time>" about 2 hours ahead; limit and stake still shown; the Unstake and Add buttons are gone |

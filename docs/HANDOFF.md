@@ -4,7 +4,7 @@ You are continuing a hackathon build (Monad Metropolis, Track 4). Deadline **14 
 
 ## 0. START HERE (collaborator)
 
-**Your first job, set by the owner: test every function in Chrome, then record it.** Nothing in the web app has been run with a real Privy login and a real hardware passkey yet. Follow [`chrome-test-plan.md`](chrome-test-plan.md) (73 numbered checks: public pages P, service console S, operator console O, security X, CLI C) and fill in [`chrome-test-report.md`](chrome-test-report.md). Mark PASS only for what you saw work; use BLOCKED with a reason otherwise. Passkeys work **only** on `https://quota-metro.vercel.app` (the registry's domain is permanent).
+**Your first job, set by the owner: test every function in Chrome, then record it.** Nothing in the web app has been run with a real Privy login and a real hardware passkey yet. Start with the live user flows in **§0b**, then follow [`chrome-test-plan.md`](chrome-test-plan.md) (73 numbered checks: public pages P, service console S, operator console O, security X, CLI C) and fill in [`chrome-test-report.md`](chrome-test-report.md). Mark PASS only for what you saw work; use BLOCKED with a reason otherwise. Passkeys work **only** on `https://quota-metro.vercel.app` (the registry's domain is permanent).
 
 Order of work:
 1. **Set up** (§7), then run the whole Chrome test plan. Fix or report every FAIL (bugs go in the report; do not change contracts or the registry address).
@@ -25,6 +25,49 @@ Useful commands (repo root):
 | `pnpm wallet-id <email>` | the console wallet id for a login; paste as `PRIVY_AGENT_WALLET_ID` to run the CLI agent as that operator |
 | `pnpm --filter @quota/web dev` | local web on port 3000 (reads the root `.env` through `next.config.mjs`; Privy allows only port 3000 and the production domain) |
 | `pnpm --filter @quota/web exec tsx scripts/operator-e2e.mts` | live server-side check on Monad (software passkey, ~0.9 MON) |
+
+## 0b. How to test the live site (user flows)
+
+Live link: **https://quota-metro.vercel.app**. Test there, in Chrome, not on a preview URL: Privy login and the passkey only work on this exact hostname. Every step below maps to an ID in [`chrome-test-plan.md`](chrome-test-plan.md); record each one in [`chrome-test-report.md`](chrome-test-report.md) (PASS only if you saw it, otherwise FAIL or BLOCKED with the reason).
+
+**Before you start:** Chrome with DevTools open (Console and Network), a device with a passkey (Windows Hello, Touch ID, or an Android phone with a screen lock), two email inboxes you can read (A and B), about **1.5 MON of test MON** per email from `https://faucet.monad.xyz` (or ask the owner to run `pnpm fund <address>`), and the explorer `https://testnet.monadvision.com` in another tab.
+
+### Flow 1: a first-time visitor (no login, ~5 min) · P1–P4, P7–P9
+1. Open the live link. Within a second or two: the headline over a dim starfield, the night-side earth rising with three status pills. No red errors in the Console.
+2. Scroll slowly with a mouse wheel, then with a trackpad. Expect one smooth, continuous scene (no stepping or stalls): the headline lifts away, the earth sinks, a line of light opens into the stake coin (back: the secret line; front: the QUOTA mark), a curved wall of request tickets wraps around it, then "One deposit. No record of who called."
+3. Keep scrolling through the light sections: four stops with drawings, the comparison board, the secret-line instrument (click "Reuses request #7": the red line and the recovered key appear), the four roles, the limits list, the code block, the footer.
+4. Click every header link (Demo, Docs, Operator, Service), "Stake an agent", both hero buttons and every footer link: none 404.
+5. Phone width (DevTools device toolbar, 375 px): no sideways scrolling, buttons reachable. Open `/does-not-exist`: a 404 page, not a crash.
+
+### Flow 2: watch a cheater get slashed (simulation, ~2 min) · P6
+1. Open `/demo`. It must say **Simulation**.
+2. Click "Send request" three times: the meter fills (3/8) and the service log shows "verified · who: unknown" rows.
+3. Click "Reuse request": the stops Violation → Secret recovered → Commit → Reveal → Paid light up in order, the meter turns red, the log shows each step. Click Reset: everything clears.
+
+### Flow 3: read the docs (~2 min) · P5
+1. Open `/docs`. Scroll: the sidebar highlights the section you are reading. Click each sidebar link.
+2. Click "Copy" on a code block and paste it somewhere: identical text, the button says "Copied".
+3. The integration table says BTX is unavailable and claims use commit then reveal.
+
+### Flow 4: check the live chain data (~3 min) · S1–S4, S7
+1. Open `/service`. Grey loading bars first, then four live numbers and the pill "Live · Monad testnet · block N" (N grows every few seconds).
+2. Compare "Agents in the tree", "Staked" and "Slashed, paid out" with the registry `0xCBdfda8ebF4302793C06a402E9753C4F43799990` on the explorer.
+3. "Live requests" shows the dashed "The request feed is offline" box (expected on the live site: no demo server is hosted). `/api/service` returns JSON with no secrets.
+
+### Flow 5: an operator stakes for an agent (the main user flow, ~15 min plus a 2-hour wait) · O1–O28, X1–X9
+1. **Sign in.** Open `/operator` logged out: "Stake for your agents" with three steps. Click "Log in with email", use email A, enter the code. Expect loading panels, then "Your agents", your email, a short wallet address, the setup tracker and "No agents yet". Log out and back in: the **same** wallet address. In an Incognito window with email B: a **different** address.
+2. **Fund.** The New agent panel shows Stake, Gas reserve and Needed in wallet, plus a box with your full address and "Copy". Send test MON to it. After about 30 s and a reload the balance updates and the tracker marks "Fund the wallet" done. Each agent needs 0.1 MON per request of its limit plus about 0.45 MON of gas headroom.
+3. **Register the passkey.** Custody → "Create passkey and register". Approve both prompts (create, then sign). Expect "Register passkey: confirmed" with a transaction link, the pill "passkey on" and "1 approval so far". Open the transaction on the explorer: "success", it called `registerPasskey`. Also try cancelling a prompt first: a clear error, nothing on-chain.
+4. **Enroll an agent.** Set "Requests per epoch" with − / + (try typing 0, 999, abc: it clamps to 1–20). Click "Enroll agent N with passkey", approve once. Within about 5 s: Agent N `active` with its limit and stake; Staked and Active agents update.
+5. **Add stake.** "Add 0.1 MON" on the active agent: no passkey prompt, stake rises by 0.1.
+6. **Unstake.** Check the withdrawal address (default: your wallet; garbage must be refused), click "Unstake", approve. The agent becomes `unstaking` with an unlock time **2 hours** ahead; Withdraw is disabled until then.
+7. **Withdraw (after 2 hours).** Reload, click "Withdraw": the agent is `withdrawn` and the stake arrives at the withdrawal address (check on the explorer). That slot is never offered again.
+8. **Security checks while logged in:** DevTools Network → `/api/operator/me` holds no keys or secrets; local storage holds only Privy items and a public passkey record; logged out, `/api/operator/me` returns 401 "log in first".
+
+### Flow 6: a real agent calls a protected service (optional, needs the repo) · C6–C10
+Run on your own machine with your own `.env`: `pnpm wallet-id <email A>`, put the id in `.env` as `PRIVY_AGENT_WALLET_ID`, enroll an agent with limit 3 on the live console, start the demo server and run the agent (exact commands in C7–C9). Expect three `OK` results, then a local refusal on the fourth. The cheat run (C10) slashes a **spare** identity; confirm the commit, reveal and `Slashed` event on the explorer.
+
+**If something fails:** note the step, the Chrome version, the Console error and any transaction hash in the report. Do not change contracts or the registry address.
 
 ## 1. What QUOTA is (one paragraph)
 Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An operator locks a stake (approved by a human passkey, verified on-chain via the P256 precompile at `0x100`); the agent joins a Merkle tree. Each request carries an RLN-v2 zero-knowledge proof of "I am a member and this is request k of my N this epoch". Reusing a request number leaks the agent's secret `a0` (Shamir two-point recovery); anyone with `a0` can slash the stake. No issuer. The primary output is a primitive (contracts, SDKs, middleware), not a consumer app.
@@ -396,6 +439,7 @@ The whole web app was restyled in one session; `DESIGN.md` is the source of trut
 - **Operator console:** redesigned sign-in page and dashboard (setup tracker, stat panels, Agents, New agent with a stake and gas breakdown, Custody). Checked with sample data only; a real Privy login has not been run on it yet (Chrome test plan O1–O32).
 - **Shared `.env`:** every app, package and script now reads the root `.env` (shell and host env still win). `apps/web/next.config.mjs` loads it and maps `QUOTA_REGISTRY_ADDRESS` and `WEBAUTHN_RP_ID` to the browser names `NEXT_PUBLIC_REGISTRY_ADDRESS` and `NEXT_PUBLIC_RP_ID` (never the RPC URL). `packages/server/scripts/phase2-exit.ts` now loads it too, so `pnpm phase2` checks the current registry from `.env` instead of its v1 fallback; set `QUOTA_REGISTRY_BLOCK` if the scan range matters. Foundry: run `forge` from the repo root with `--root contracts` to pick up the same file.
 - **Chrome test plan:** P1, P2 and O1 were rewritten for the new pages; re-run P1–P9 and O1 against the new design.
+- **Design audit pass (tastemaker):** route stops got drawn artifacts; one display face (Archivo expanded) for every heading, section heads capped near 60% of the hero; skeleton loading on `/service` and `/operator`; a designed "feed offline" state on `/service`; the docs sidebar marks the current section and code blocks have a copy button; the demo has a real quota meter; button hover no longer scales. The roles section keeps its original 2×2 layout (owner choice). Rules for later passes: `.tastemaker/style-lock.md`; decisions: `.tastemaker/decisions.log`.
 - `moto-landing/` is the static reference prototype the design was rebuilt from (not deployed, not linked); delete it once it is no longer useful.
 
 ## 10. Open items needing the owner
