@@ -89,7 +89,8 @@ Goal: kill unknowns before writing real code.
   - [ ] **Qwen run:** the owner is getting sponsor credits (`QWEN_*` in `.env`).
 - [x] Violation script for the slash demo: `demo-mcp agent --cheat` (Phase 4/5) and `phase5-e2e` (v3 slash, profitable for the slasher).
 - [x] **Registry v3** on the public domain `quota-metro.vercel.app`: one-pass slash removal (reveal −29% gas), unit 0.1 MON, verified on Sourcify. Privy policy repointed (1 MON cap).
-- [ ] Operator console + service console deployed with public URLs and test credentials for judges. **Not started:** `apps/web` belongs to another contributor (ask before touching), and it still shows demo data.
+- [x] Service console live (`/service`: registry state from Monad + the demo server's request feed when `FEED_URL` is set).
+- [x] Operator console built (`/operator`: Privy login, real passkey, enroll / add stake / unstake / withdraw); server code verified live on Monad with a software passkey. [ ] Real-browser login + hardware passkey on the public domain: owner to test. [ ] Test credentials for judges and funded judge wallets.
 - [x] Contracts verified (v3); root `README.md` with access instructions (CLI path; no console yet).
 - [x] Draft the Qwen **article** (`docs/qwen-article-draft.md`, with sections marked pending a real Qwen run).
 

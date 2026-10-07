@@ -356,11 +356,12 @@ Identities already used: 0 (index 7, Active, limit 5) and 1 (index 8, Slashed). 
    - Submit by 13 Oct evening.
 4. **Optional:** move `requestUnstake`/`changeLimit` to the one-pass update too (gas). That needs a redeploy, so only do it if the consoles need it.
 
-## 9b. Operator console plan (decided 2026-10-06; not built)
-- Browser: `@privy-io/react-auth` login (email) on `quota-metro.vercel.app`; a real WebAuthn credential created with `rp.id = quota-metro.vercel.app` (the registry's immutable rpId); assertions signed per action with the challenge from §5 (the working browser code is in `contracts/tools/passkey-demo/index.html`: DER parse, low-s, challenge).
-- Server routes in `apps/web` (verify the Privy access token first): (1) ensure the user's agent wallet (`createAgentWallet`: owner = the user, our key quorum additional signer, policy to the registry); (2) return `idCommitment` for identity n (`deriveSecret` via that wallet, never the secret); (3) relay a registry call signed by that wallet with the browser's passkey assertion (the contract rejects it without a valid assertion).
-- The live service console already works (`/service`, `/api/service`). Its request feed needs `FEED_URL` pointing at a reachable demo server (`GET /feed`); hosting on Render is parked.
-- Owner setup needed first: Privy dashboard (allowed origins `https://quota-metro.vercel.app` and `http://localhost:3000`, email login on, public app ID), Vercel env vars (`NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_AUTH_PRIVATE_KEY`, `PRIVY_AUTH_KEY_QUORUM_ID`, a funded relayer path for gas), and **rotate the credentials that were pasted into chat before putting them in Vercel**.
+## 9b. Operator console (built 2026-10-07; real-browser test pending)
+- `apps/web/app/operator` (+ `lib/passkey-*.ts`, `lib/operator-server.ts`, `/api/operator/{me,relay}`): Privy email login, a real WebAuthn passkey, one user-owned Privy wallet per user as the on-chain operator, relay of registerPasskey / enroll / topUp / requestUnstake / unstake. The live service console is `/service` (`/api/service`); its request feed needs `FEED_URL` (a reachable demo server's `/feed`; hosting on Render is parked).
+- Verified on Monad v3 without a browser by `apps/web/scripts/operator-e2e.mts` (software passkey, throwaway Privy user, spends ~0.9 MON). **Not yet verified: a real Privy login and hardware passkey on `https://quota-metro.vercel.app/operator`.** The passkey only works on that hostname (the registry's rpId is immutable); Privy accepts only that origin and `http://localhost:3000`.
+- Vercel production variables in use: `NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_AUTH_PRIVATE_KEY`, `PRIVY_AUTH_KEY_QUORUM_ID`, `PRIVY_AGENT_POLICY_ID`. Optional: `OPERATOR_MAX_LIMIT` (default 20), `QUOTA_MAX_FEE_GWEI` (120), `MONAD_RPC_URL`, `FEED_URL`.
+- Each user needs about 0.1 MON per message of limit plus ~0.45 MON of gas in their operator wallet (shown in the UI with the address and a faucet link). The wallet's policy lets our key sign only registry calls (value ≤ 1 MON), so test MON sent to it cannot be swept by us.
+- **Security follow-up for the owner:** the old key quorum is still alive and still trusted by the three 5 Oct agent wallets; delete it in the Privy dashboard (those wallets, one with 0.34 MON and an active v3 stake, then stop signing for us).
 
 ## 10. Open items needing the owner
 - **Qwen key** (sponsor credits) → `QWEN_BASE_URL`, `QWEN_API_KEY`, `QWEN_MODEL` in `.env`.
