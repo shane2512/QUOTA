@@ -1,3 +1,5 @@
+import { Code, DocsNav } from "@/components/DocsKit";
+
 const status = [
   ["Passkey custody (P256VERIFY)", "ok", "Precompile verified on testnet; contract work in progress"],
   ["Privy agent wallets", "ok", "Deterministic secret derivation and sign-only on Monad confirmed"],
@@ -8,16 +10,18 @@ const status = [
   ["Qwen Scout agent", "wait", "Deferred; agent loop stays provider-agnostic"],
 ] as const;
 
+const toc: [string, string][] = [
+  ["service", "Service quickstart"],
+  ["agent", "Agent quickstart"],
+  ["how", "How a slash works"],
+  ["threats", "Threat model"],
+  ["status", "Integration status"],
+];
+
 export default function Docs() {
   return (
     <div className="wrap docs">
-      <aside aria-label="On this page">
-        <a href="#service">Service quickstart</a>
-        <a href="#agent">Agent quickstart</a>
-        <a href="#how">How a slash works</a>
-        <a href="#threats">Threat model</a>
-        <a href="#status">Integration status</a>
-      </aside>
+      <DocsNav items={toc} />
       <article>
         <h1>Docs</h1>
         <p>QUOTA is a primitive: contracts, two SDKs and a middleware. The snippets below show the target interface; packages are under construction and names may change.</p>
@@ -25,7 +29,7 @@ export default function Docs() {
         <section id="service">
           <h2>Service quickstart</h2>
           <p>Protect an Express, Hono or MCP server in a few lines. You choose how many requests an hour and which trust lists you accept.</p>
-          <pre className="code"><code>{`pnpm add @quota/server @quota/slasher
+          <Code>{`pnpm add @quota/server @quota/slasher
 
 import { quota } from "@quota/server";
 import { Slasher, DynamicServiceWallet } from "@quota/slasher";
@@ -37,7 +41,7 @@ app.use(quota({
   perEpoch: 100,          // requests per hour per staked agent
   trees: ["open"],        // or ["open", "screened"]
   onViolation: slasher.submit,
-}));`}</code></pre>
+}));`}</Code>
           <h3>What you get</h3>
           <ul>
             <li>Proof verification off-chain in milliseconds.</li>
@@ -49,12 +53,12 @@ app.use(quota({
         <section id="agent">
           <h2>Agent quickstart</h2>
           <p>Stake once from the operator console, then sign each request through the SDK.</p>
-          <pre className="code"><code>{`import { QuotaClient, PrivyAgentWallet } from "@quota/client";
+          <Code>{`import { QuotaClient, PrivyAgentWallet } from "@quota/client";
 
 const quota = new QuotaClient({ wallet: new PrivyAgentWallet() });
 
 const headers = await quota.signRequest("lantern-search", payloadHash);
-await fetch(url, { headers });`}</code></pre>
+await fetch(url, { headers });`}</Code>
           <p>The client tracks request numbers per epoch and refuses to exceed your limit, so an honest agent can never trigger a slash by accident.</p>
         </section>
 

@@ -63,11 +63,11 @@ export default function Demo() {
             <button className="btn danger" onClick={cheat} disabled={k === 0 || stage >= 0}>Reuse request #{Math.max(k - 1, 0)}</button>
             <button className="btn" onClick={reset}>Reset</button>
           </div>
-          <p className="label" style={{ marginBottom: 8 }}>Request numbers used</p>
-          <span className={"ticks" + (stage >= 0 ? " hot" : "")} style={{ transform: "scale(1.6)", transformOrigin: "left center", marginBottom: 16 }} aria-label={`${k} of ${N} used`}>
-            {Array.from({ length: N }, (_, i) => <i key={i} className={i < k ? "on" : ""} />)}
-          </span>
-          <p className="small" style={{ marginTop: 18 }}>
+          <div className={"meter" + (stage >= 0 ? " hot" : "")} role="meter" aria-valuemin={0} aria-valuemax={N} aria-valuenow={k} aria-label="Request numbers used this epoch">
+            <div className="meter-head"><span className="label">Request numbers used</span><b className="tnum">{k}<small>/{N}</small></b></div>
+            <div className="meter-bar">{Array.from({ length: N }, (_, i) => <i key={i} className={i < k ? "on" : ""} />)}</div>
+          </div>
+          <p className="small" style={{ marginTop: 16 }}>
             {k === 0 ? "Send a request or two first." : stage >= 0 ? "Reusing a number is the only way to exceed the quota, and it exposes the key." : `${N - k} of ${N} requests left this epoch.`}
           </p>
         </section>

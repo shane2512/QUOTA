@@ -107,11 +107,14 @@ export function Dashboard(p: DashboardProps) {
         <div><dt>Wallet balance</dt><dd className="tnum">{me ? mon(balance, 3) : "–"}<small>MON</small></dd></div>
         <div><dt>Staked</dt><dd className="tnum">{me ? mon(staked, 2) : "–"}<small>MON</small></dd></div>
         <div><dt>Active agents</dt><dd className="tnum">{me ? active : "–"}<small>{me ? `of ${me.agents.length} slots` : ""}</small></dd></div>
-        <div><dt>Passkey</dt><dd>{me ? (me.passkey.registered ? "Registered" : "Not yet") : "–"}<small>{me?.passkey.registered ? `${me.passkey.nonce} approvals` : ""}</small></dd></div>
+        <div><dt>Passkey</dt><dd>{me ? (me.passkey.registered ? "Registered" : "Not yet") : "–"}<small>{me?.passkey.registered ? `${me.passkey.nonce} approval${me.passkey.nonce === "1" ? "" : "s"}` : ""}</small></dd></div>
       </dl>
 
       {!me ? (
-        <p className="empty">Loading your operator wallet…</p>
+        <div className="op-grid" aria-busy="true" aria-label="Loading your operator wallet">
+          <section className="panel"><span className="skel" style={{ width: "30%" }} /><div className="skel-rows">{[0, 1, 2].map((i) => <span key={i} className="skel" />)}</div></section>
+          <section className="panel"><span className="skel" style={{ width: "45%" }} /><div className="skel-rows">{[0, 1].map((i) => <span key={i} className="skel" />)}</div></section>
+        </div>
       ) : (
         <div className="op-grid">
           <section className="panel">
@@ -190,7 +193,7 @@ export function Dashboard(p: DashboardProps) {
                 </>
               ) : (
                 <>
-                  <p className="small" style={{ marginBottom: 16 }}>{me.passkey.nonce} approvals so far{p.localPasskey ? " · this device" : " · created on another device or browser"}.</p>
+                  <p className="small" style={{ marginBottom: 16 }}>{me.passkey.nonce} approval{me.passkey.nonce === "1" ? "" : "s"} so far{p.localPasskey ? " · this device" : " · created on another device or browser"}.</p>
                   <div className="field" style={{ marginBottom: 0 }}>
                     <label htmlFor="dest">Withdrawal address</label>
                     <input id="dest" type="text" value={p.dest} onChange={(e) => p.setDest(e.target.value.trim())} spellCheck={false} autoComplete="off" className="mono" />

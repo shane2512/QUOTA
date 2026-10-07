@@ -21,15 +21,15 @@ export default function Shamir({ compact = false }: { compact?: boolean }) {
           <g clipPath="url(#clip)">
             {decoys.map((d) => (
               <line key={d.m} x1={X(0)} y1={Y(d.b)} x2={X(10)} y2={Y(d.b + d.m * 10)} stroke="var(--ink-3)" strokeWidth="2" strokeDasharray="6 7"
-                style={{ opacity: two ? 0 : 0.7, transition: "opacity 420ms var(--ease)" }} />
+                style={{ opacity: two ? 0 : 0.7, transition: "opacity 260ms var(--ease)" }} />
             ))}
             <line x1={X(0)} y1={Y(yAt(0))} x2={X(10)} y2={Y(yAt(10))} stroke="var(--signal)" strokeWidth="5" strokeLinecap="round"
-              style={{ opacity: two ? 1 : 0, transition: "opacity 420ms var(--ease) 120ms" }} />
+              style={{ opacity: two ? 1 : 0, transition: "opacity 260ms var(--ease) 80ms" }} />
           </g>
           <circle cx={X(P1)} cy={Y(yAt(P1))} r="9" fill="var(--ink)" />
-          <circle cx={X(P2)} cy={Y(yAt(P2))} r="9" fill="var(--ink)" style={{ opacity: two ? 1 : 0, transition: "opacity 320ms var(--ease)" }} />
+          <circle cx={X(P2)} cy={Y(yAt(P2))} r="9" fill="var(--ink)" style={{ opacity: two ? 1 : 0, transition: "opacity 220ms var(--ease)" }} />
           <text x={X(P1) + 14} y={Y(yAt(P1)) + 28} fontSize="14" fill="var(--ink)" style={{ fontFamily: "var(--f-mono)" }}>share 1</text>
-          <g style={{ opacity: two ? 1 : 0, transition: "opacity 320ms var(--ease) 200ms" }}>
+          <g style={{ opacity: two ? 1 : 0, transition: "opacity 220ms var(--ease) 120ms" }}>
             <text x={X(P2) + 12} y={Y(yAt(P2)) + 28} fontSize="14" fill="var(--ink)" style={{ fontFamily: "var(--f-mono)" }}>share 2</text>
             <circle cx={X(0)} cy={Y(A0)} r="12" fill="var(--paper)" stroke="var(--signal-ink)" strokeWidth="5" />
             <text x={X(0) + 20} y={Y(A0) - 14} fontSize="18" fontWeight="700" fill="var(--signal-ink)" style={{ fontFamily: "var(--f-mono)" }}>a₀ = secret key</text>

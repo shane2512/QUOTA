@@ -44,6 +44,8 @@ export default function Service() {
   const verified = f?.counts.verified ?? 0;
   const violations = f?.counts.violation ?? 0;
   const rejected = f ? Object.entries(f.counts).filter(([k]) => k !== "verified").reduce((s, [, n]) => s + n, 0) : 0;
+  const loading = !d && !err; // first fetch still in flight: show skeletons, not dashes
+  const sk = <span className="skel" aria-hidden="true" />;
 
   return (
     <div className="wrap shell">
@@ -59,17 +61,17 @@ export default function Service() {
       </header>
 
       <dl className="facts">
-        <div><dt>Agents in the tree</dt><dd className="tnum">{c ? c.leavesActive : "–"}<small>{c ? `${c.leavesRemoved} removed` : ""}</small></dd></div>
-        <div><dt>Staked in the registry</dt><dd className="tnum">{c ? mon(staked, 2) : "–"}<small>MON</small></dd></div>
-        <div><dt>Verified requests</dt><dd className="tnum">{f ? verified.toLocaleString("en-US") : "–"}<small>{f ? `${rejected} rejected` : ""}</small></dd></div>
-        <div><dt>Slashed, paid out</dt><dd className="tnum">{c ? mon(paid, 3) : "–"}<small>MON</small></dd></div>
+        <div><dt>Agents in the tree</dt><dd className="tnum">{loading ? sk : c ? c.leavesActive : "–"}<small>{c ? `${c.leavesRemoved} removed` : ""}</small></dd></div>
+        <div><dt>Staked in the registry</dt><dd className="tnum">{loading ? sk : c ? mon(staked, 2) : "–"}{!loading && <small>MON</small>}</dd></div>
+        <div><dt>Verified requests</dt><dd className="tnum">{loading ? sk : f ? verified.toLocaleString("en-US") : "–"}<small>{f ? `${rejected} rejected` : !loading ? "feed offline" : ""}</small></dd></div>
+        <div><dt>Slashed, paid out</dt><dd className="tnum">{loading ? sk : c ? mon(paid, 3) : "–"}{!loading && <small>MON</small>}</dd></div>
       </dl>
 
       <div className="two">
         <section className="block">
           <header>
             <h2 className="h3">Live requests</h2>
-            {f ? <span className="pill ok"><i />streaming</span> : <span className="pill wait"><i />demo server offline</span>}
+            {f ? <span className="pill ok"><i />streaming</span> : loading ? <span className="pill"><i />connecting</span> : <span className="pill wait"><i />demo server offline</span>}
           </header>
           {f ? (
             <div className="scroll-x">
@@ -87,8 +89,16 @@ export default function Service() {
                 </tbody>
               </table>
             </div>
+          ) : loading ? (
+            <div className="skel-rows" aria-hidden="true">{[0, 1, 2, 3].map((i) => <span key={i} className="skel" />)}</div>
           ) : (
-            <p className="small">{d?.feedError ?? "Loading…"}. Registry data on this page is still live; request rows come from the demo server&apos;s own verifier.</p>
+            <div className="state">
+              <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="17" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 5" /><circle cx="24" cy="24" r="4" fill="var(--amber)" /></svg>
+              <b>The request feed is offline</b>
+              <p>Registry numbers above are live from Monad. Request rows come from a demo server&apos;s own verifier, and none is reachable{d?.feedError ? `: ${d.feedError}` : " right now"}.</p>
+              <p className="small">Run one locally, then point <code>FEED_URL</code> at its <code>/feed</code>:</p>
+              <pre className="code"><code>pnpm --filter @quota/demo-mcp start</code></pre>
+            </div>
           )}
           <p className="small" style={{ marginTop: 12 }}>Rows show nullifiers, never callers. A repeated message id with a different request is a violation: the server recovers the agent&apos;s secret and starts a slash.</p>
         </section>

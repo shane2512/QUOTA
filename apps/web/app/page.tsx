@@ -4,11 +4,41 @@ import Shamir from "@/components/Shamir";
 import Rise from "@/components/Rise";
 
 const stops = [
-  { name: "Stake", body: "An operator locks a deposit with a passkey and the agent joins a public list of staked members.", rows: [["Custody", "Passkey, checked on-chain"], ["Allowance", "Linear in stake"]] },
-  { name: "Prove", body: "Every request carries a zero-knowledge proof: a staked member, request k of N this epoch.", rows: [["Circuit", "RLN-v2, audited and reused"], ["Scope", "Quotas are per server"]] },
-  { name: "Check", body: "The service checks the proof off-chain and learns nothing about who sent it.", rows: [["Check", "Off-chain, milliseconds"], ["Memory", "One line per nullifier"]] },
-  { name: "Slash", body: "Reusing a request number leaks the agent's key. Anyone holding it can claim the stake.", rows: [["Claim path", "Commit, then reveal"], ["Payout", "Slasher paid, rest burned"]] },
+  { name: "Stake", body: "Lock a deposit with a passkey. The agent joins a public list of staked members.", rows: [["Custody", "Passkey, checked on-chain"], ["Allowance", "Linear in stake"]] },
+  { name: "Prove", body: "Each request carries a zero-knowledge proof: a member, request k of N. Never which one.", rows: [["Circuit", "RLN-v2, audited and reused"], ["Scope", "Quotas are per server"]] },
+  { name: "Check", body: "The service verifies off-chain and learns nothing about who sent it.", rows: [["Check", "Off-chain, milliseconds"], ["Memory", "One line per nullifier"]] },
+  { name: "Slash", body: "A reused number leaks the key. Anyone holding it can claim the stake.", rows: [["Claim path", "Commit, then reveal"], ["Payout", "Slasher paid, rest burned"]] },
 ];
+
+/* One drawn artifact per stop, so the route reads at a glance before any copy does. */
+function StopArt({ i }: { i: number }) {
+  const ink = "currentColor";
+  return (
+    <svg viewBox="0 0 120 72" className="stop-art" aria-hidden="true">
+      {i === 0 && (<g fill="none" stroke={ink} strokeWidth="2">
+        {[48, 38, 28].map((y) => <g key={y}><ellipse cx="60" cy={y} rx="30" ry="9" fill="var(--ground)" /><path d={`M30 ${y}v6M90 ${y}v6`} /><path d={`M30 ${y + 6}a30 9 0 0 0 60 0`} /></g>)}
+        <circle cx="60" cy="28" r="3.5" fill={ink} />
+      </g>)}
+      {i === 1 && (<g>
+        <rect x="18" y="12" width="84" height="48" rx="6" fill="var(--ground)" stroke={ink} strokeWidth="2" />
+        <circle cx="30" cy="24" r="3" fill="var(--leaf)" />
+        <text x="38" y="27" fontSize="8" fill={ink} style={{ fontFamily: "var(--f-mono)" }}>PROOF</text>
+        <text x="30" y="50" fontSize="17" fontWeight="600" fill={ink} style={{ fontFamily: "var(--f-sans)" }}>k 7<tspan fontSize="10" fillOpacity=".55"> /100</tspan></text>
+      </g>)}
+      {i === 2 && (<g fill="none" stroke={ink} strokeWidth="2">
+        <path d="M34 62V22a8 8 0 0 1 8-8h36a8 8 0 0 1 8 8v40" />
+        <circle cx="60" cy="38" r="13" stroke="var(--leaf)" />
+        <path d="M54 38.5l4 4 8-8.5" stroke="var(--leaf)" strokeLinecap="round" strokeLinejoin="round" />
+      </g>)}
+      {i === 3 && (<g fill="none" strokeWidth="2">
+        <path d="M14 60h92M14 60V10" stroke={ink} />
+        <path d="M14 52L106 16" stroke="var(--signal)" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="44" cy="40" r="4.5" fill={ink} stroke="none" /><circle cx="78" cy="27" r="4.5" fill={ink} stroke="none" />
+        <circle cx="14" cy="52" r="5.5" fill="var(--ground)" stroke="var(--signal)" strokeWidth="2.5" />
+      </g>)}
+    </svg>
+  );
+}
 
 const board = [
   ["API keys and accounts", "Every call ties to one identity, and a full activity log builds up. Agents cannot fill in signup forms.", "bad", "Logs everything"],
@@ -47,9 +77,10 @@ export default function Home() {
             <p>The whole journey of a request, from the stake that backs it to the slash that punishes a repeat.</p>
           </div>
           <ol className="route" data-rise>
-            {stops.map((s) => (
+            {stops.map((s, idx) => (
               <li key={s.name} className={s.name === "Slash" ? "hot" : undefined}>
                 <i aria-hidden="true" />
+                <StopArt i={idx} />
                 <h3 className="h3">{s.name}</h3>
                 <p>{s.body}</p>
                 <dl>{s.rows.map(([a, b]) => <div key={a}><dt>{a}</dt><dd>{b}</dd></div>)}</dl>
