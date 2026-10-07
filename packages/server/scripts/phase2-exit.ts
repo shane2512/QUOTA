@@ -3,6 +3,8 @@
 /// 2. Honest requests verify; message-id reuse recovers the secret; per-server nullifiers do not collide.
 /// 3. Measure proof generation and verification time.
 import { cpus } from "node:os";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { createPublicClient, http, type Address } from "viem";
 import { QuotaClient } from "@quota/client";
 import {
@@ -14,6 +16,9 @@ import {
   verifyMerkleProof,
 } from "@quota/core";
 import { QuotaVerifier, RegistryRootChecker, type Violation } from "../src/index.ts";
+
+const rootEnv = fileURLToPath(new URL("../../../.env", import.meta.url)); // the shared monorepo .env
+if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
 const RPC = process.env.MONAD_RPC_URL || "https://testnet-rpc.monad.xyz";
 const REGISTRY = (process.env.QUOTA_REGISTRY_ADDRESS || "0x05a5fe209E19C6707e2E701A76A0C94b2351E0ac") as Address;
