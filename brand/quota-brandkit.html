@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920">
+<title>QUOTA Brand Kit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,600&family=Inter+Tight:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ground: #0a0b0b; --paper: #121415; --paper-2: #181b1c; --ink: #ececeb; --ink-2: #a5a9a8; --ink-3: #8d9291;
+    --rule: #26292b; --signal: #ff6a45; --leaf: #3fd39a; --amber: #f2b632; --pill: #e4e6e3; --concrete: #e5e8e6;
+    --display: "Archivo", "Arial Black", sans-serif; --sans: "Inter Tight", "Helvetica Neue", Arial, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { width: 1920px; height: 1440px; background: #151616; color: var(--ink); font-family: var(--sans); padding: 28px; }
+  .board { width: 100%; height: 100%; display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); gap: 20px; }
+  .p { position: relative; border-radius: 14px; background: var(--ground); overflow: hidden; border: 1px solid #1d2022; }
+  .p.light { background: var(--concrete); color: #121414; border-color: #d3d7d5; }
+  .tag { position: absolute; left: 26px; bottom: 22px; font: 500 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+  .num { position: absolute; right: 26px; bottom: 22px; font: 500 12px var(--mono); color: var(--ink-3); }
+  .light .tag, .light .num { color: #555a58; }
+  .disp { font-family: var(--display); font-weight: 600; font-stretch: 125%; text-transform: uppercase; letter-spacing: -.02em; line-height: 1; }
+  svg { display: block; }
+
+  /* 1 cover */
+  .cover { display: grid; place-items: center; height: 100%; }
+  .cover .lock { display: flex; align-items: center; gap: 26px; }
+  .cover .word { font-size: 70px; }
+
+  /* 2 construction */
+  .constr svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .note { position: absolute; font: 500 13px var(--mono); color: var(--ink-2); letter-spacing: .02em; }
+  .note b { color: var(--ink); font-weight: 500; }
+
+  /* 3 browser */
+  .chrome { position: absolute; inset: 58px 48px 62px; border-radius: 12px; background: #0e1011; border: 1px solid var(--rule); overflow: hidden; }
+  .bar { height: 46px; border-bottom: 1px solid var(--rule); display: flex; align-items: center; gap: 8px; padding: 0 16px; }
+  .bar i { width: 11px; height: 11px; border-radius: 50%; background: #2a2e30; }
+  .url { margin-left: 18px; flex: 1; height: 28px; border-radius: 14px; background: #171a1b; font: 400 13px var(--mono); color: var(--ink-2); display: flex; align-items: center; padding: 0 14px; }
+  .site { padding: 36px 36px 0; text-align: center; }
+  .site h4 { font-size: 33px; }
+  .site p { margin: 16px auto 0; max-width: 380px; font-size: 16px; line-height: 1.5; color: var(--ink-2); }
+  .btns { margin-top: 24px; display: flex; gap: 12px; justify-content: center; }
+  .btn { height: 44px; padding: 0 22px; border-radius: 22px; display: grid; place-items: center; font: 500 15px var(--sans); background: #1a1d1f; color: var(--ink); border: 1px solid var(--rule); }
+  .btn.pri { background: var(--pill); color: #121414; border-color: var(--pill); }
+
+  /* 4 essence */
+  .essence { display: grid; align-content: center; height: 100%; padding: 0 56px; }
+  .essence h2 { font-size: 56px; line-height: 1.04; }
+  .essence h2 span { color: var(--ink-3); }
+  .essence p { margin-top: 28px; font: 400 14px var(--mono); color: var(--ink-3); letter-spacing: .04em; }
+
+  /* 5 color */
+  .sw { position: absolute; inset: 28px 28px 62px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 12px; }
+  .sw div { border-radius: 10px; padding: 16px; display: flex; flex-direction: column; justify-content: flex-end; font: 500 12px var(--mono); letter-spacing: .03em; border: 1px solid #23272a; }
+  .sw b { font: 500 16px var(--sans); display: block; margin-bottom: 4px; }
+
+  /* 6 type */
+  .type { padding: 40px 44px; height: 100%; display: grid; grid-template-columns: .85fr 1.15fr; gap: 30px; align-content: start; }
+  .aa { font-size: 150px; line-height: .95; text-transform: none; letter-spacing: -.04em; }
+  .type h5 { font: 500 12px var(--mono); color: #555a58; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
+  .type .row { margin-top: 26px; }
+  .type .big { font-size: 25px; line-height: 1.2; }
+  .type .m { font: 400 16px var(--mono); }
+
+  /* 7 coin */
+  .coinp { display: grid; place-items: center; height: 100%; background: radial-gradient(ellipse 50% 50% at 50% 48%, #1a1d1f, #0a0b0b 70%); }
+
+  /* 8 image */
+  .img { position: absolute; inset: 0; background: #060707 url(../apps/web/public/earth/night-4k.v1.webp) 52% 25% / 330% auto; filter: brightness(1.9) contrast(1.15) saturate(.55); }
+  .img::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 80% 70% at 50% 58%, transparent 30%, rgba(6,7,7,.78) 100%), linear-gradient(to top, rgba(6,7,7,.85), transparent 45%); }
+  .img .dots { position: absolute; inset: 0; background-image: radial-gradient(rgba(0,0,0,.55) 1px, transparent 1.4px); background-size: 5px 5px; z-index: 1; mix-blend-mode: multiply; opacity: .5; }
+  .img .cap { position: absolute; z-index: 2; left: 26px; top: 24px; font: 500 12px var(--mono); letter-spacing: .08em; color: var(--ink-2); text-transform: uppercase; }
+
+  /* 9 system */
+  .sys { position: absolute; inset: 30px 32px 62px; display: grid; gap: 14px; align-content: start; }
+  .chips { display: flex; gap: 10px; flex-wrap: wrap; }
+  .chip { height: 36px; padding: 0 16px 0 12px; border-radius: 18px; display: inline-flex; align-items: center; gap: 9px; background: #181b1c; border: 1px solid var(--rule); font: 400 13px var(--sans); }
+  .chip i { width: 9px; height: 9px; border-radius: 50%; }
+  .cmd { height: 52px; border-radius: 10px; background: #0d0f10; border: 1px solid #23272a; display: flex; align-items: center; padding: 0 18px; font: 400 15px var(--mono); color: #e3e6e5; }
+  .cmd s { text-decoration: none; color: var(--ink-3); margin-right: 12px; }
+  .tickets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .tk { height: 112px; border-radius: 8px; padding: 12px; background: linear-gradient(160deg, #1b1e20, #111314); border: 1px solid rgba(255,255,255,.07); display: flex; flex-direction: column; font: 400 11px var(--mono); color: #a9adac; text-transform: uppercase; letter-spacing: .06em; }
+  .tk .k { margin-top: auto; font: 500 34px var(--sans); color: #ececeb; letter-spacing: -.03em; text-transform: none; line-height: 1; }
+  .tk .k small { font-size: 14px; color: #8d9291; }
+  .tk .t { display: flex; align-items: center; gap: 7px; color: #c9cccb; }
+  .tk .t i { width: 7px; height: 7px; border-radius: 50%; background: var(--leaf); }
+  .tk.bad { border-color: rgba(255,106,69,.4); } .tk.bad .t, .tk.bad .t b { color: #ff8f72; } .tk.bad .t i { background: var(--signal); }
+</style>
+</head>
+<body>
+<div class="board">
+
+  <!-- 1 cover -->
+  <section class="p">
+    <div class="cover"><div class="lock">
+      <svg width="92" height="92" viewBox="0 0 32 32"><circle cx="16" cy="16" r="11" fill="none" stroke="#ececeb" stroke-width="3.6"/><rect x="1.5" y="13.6" width="29" height="4.8" rx=".6" fill="#ececeb"/></svg>
+      <div class="disp word">Quota</div>
+    </div></div>
+    <span class="tag">Identity / Mark + wordmark</span><span class="num">01</span>
+  </section>
+
+  <!-- 2 construction -->
+  <section class="p constr">
+    <svg viewBox="0 0 620 440" preserveAspectRatio="xMidYMid slice">
+      <g stroke="#1e2224" stroke-width="1">
+        <path d="M0 220H620M310 0V440"/><path d="M0 110H620M0 330H620M155 0V440M465 0V440" stroke="#16191a"/>
+      </g>
+      <g transform="translate(310 220) scale(8.4) translate(-16 -16)">
+        <circle cx="16" cy="16" r="11" fill="none" stroke="#ececeb" stroke-width="3.6"/>
+        <rect x="1.5" y="13.6" width="29" height="4.8" rx=".6" fill="#ececeb"/>
+      </g>
+      <g fill="none" stroke="#ff6a45" stroke-width="1.2">
+        <circle cx="310" cy="220" r="92.4" stroke-dasharray="3 4"/><circle cx="310" cy="220" r="123" stroke="#3a3f41" stroke-dasharray="2 5"/>
+        <path d="M66 220H554" stroke="#ff6a45" stroke-opacity=".5"/>
+      </g>
+      <g fill="#ff6a45"><circle cx="310" cy="127.6" r="3"/><circle cx="66" cy="220" r="3"/><circle cx="554" cy="220" r="3"/></g>
+    </svg>
+    <span class="note" style="left:40px;top:38px"><b>Ring</b> &nbsp;the deposit, locked</span>
+    <span class="note" style="right:40px;top:38px"><b>Bar</b> &nbsp;the limit, drawn across it</span>
+    <span class="note" style="left:40px;bottom:56px">r 11 / stroke 3.6 / bar 29 × 4.8</span>
+    <span class="tag">Construction</span><span class="num">02</span>
+  </section>
+
+  <!-- 3 browser -->
+  <section class="p">
+    <div class="chrome">
+      <div class="bar"><i></i><i></i><i></i><div class="url">quota-metro.vercel.app</div></div>
+      <div class="site">
+        <h4 class="disp">Rate limits<br>that keep no record</h4>
+        <p>Agents lock a deposit and prove they are within quota without saying who they are.</p>
+        <div class="btns"><div class="btn pri">Watch a cheater get slashed</div><div class="btn">Read the quickstart</div></div>
+      </div>
+    </div>
+    <span class="tag">Web application</span><span class="num">03</span>
+  </section>
+
+  <!-- 4 essence -->
+  <section class="p">
+    <div class="essence">
+      <h2 class="disp">Prove the<br>limit.<br><span>Keep the<br>secret.</span></h2>
+      <p>PRIVATE RATE LIMITS FOR AI AGENTS</p>
+    </div>
+    <span class="tag">Brand idea</span><span class="num">04</span>
+  </section>
+
+  <!-- 5 color -->
+  <section class="p">
+    <div class="sw">
+      <div style="background:#0a0b0b;color:#ececeb"><b>Ground</b>#0A0B0B</div>
+      <div style="background:#ececeb;color:#121414"><b>Ink</b>#ECECEB</div>
+      <div style="background:#e5e8e6;color:#121414"><b>Concrete</b>#E5E8E6</div>
+      <div style="background:#3fd39a;color:#06281b"><b>Leaf</b>#3FD39A · verified</div>
+      <div style="background:#ff6a45;color:#2b0c03"><b>Signal</b>#FF6A45 · slashed</div>
+      <div style="background:#f2b632;color:#2b1d02"><b>Amber</b>#F2B632 · pending</div>
+    </div>
+    <span class="tag">Colour carries meaning only</span><span class="num">05</span>
+  </section>
+
+  <!-- 6 type -->
+  <section class="p light">
+    <div class="type">
+      <div><h5>Display / Archivo<br>expanded 600</h5><div class="disp aa">Aa</div></div>
+      <div>
+        <div class="row" style="margin-top:0"><h5>Text / Inter Tight</h5><div class="big" style="font-family:var(--sans);font-weight:500">Prove you are within quota without saying who you are.</div></div>
+        <div class="row"><h5>Data / JetBrains Mono</h5><div class="m">0x9be8…2113 · 3 ms</div><div class="m" style="margin-top:6px">request 41 of 100</div></div>
+      </div>
+    </div>
+    <div style="position:absolute;left:44px;right:44px;bottom:70px;border-top:1px solid #c4c9c7;padding-top:16px">
+      <div class="disp" style="font-size:21px;letter-spacing:0">ABCDEFGHIJKLMNOPQRSTUVWXYZ</div>
+      <div style="font:400 15px var(--mono);margin-top:10px;color:#3d4240">0123456789 &nbsp;/ &nbsp;0x · … → ✓ · % &amp; ?</div>
+    </div>
+    <span class="tag">Typography</span><span class="num">06</span>
+  </section>
+
+  <!-- 7 coin -->
+  <section class="p">
+    <div class="coinp">
+      <svg width="400" height="400" viewBox="0 0 400 400">
+        <defs>
+          <radialGradient id="rim" cx=".4" cy=".35" r=".8"><stop offset="0" stop-color="#d4d9dc"/><stop offset=".7" stop-color="#868d93"/><stop offset="1" stop-color="#a6acb1"/></radialGradient>
+          <linearGradient id="face" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eef1f3"/><stop offset=".5" stop-color="#b9bfc4"/><stop offset="1" stop-color="#dfe3e6"/></linearGradient>
+          <path id="arc" d="M200 200 m-152 0 a152 152 0 1 1 304 0 a152 152 0 1 1 -304 0"/>
+        </defs>
+        <circle cx="200" cy="200" r="190" fill="url(#rim)"/>
+        <circle cx="200" cy="200" r="178" fill="url(#face)"/>
+        <circle cx="200" cy="200" r="168" fill="none" stroke="#6d747a" stroke-width="1.4" stroke-dasharray="1.5 4.2"/>
+        <text font-family="JetBrains Mono, monospace" font-weight="500" font-size="17" letter-spacing="4.4" fill="#4b5157"><textPath href="#arc" startOffset="2%">QUOTA · DEPOSIT-BACKED RATE LIMITS · MONAD ·</textPath></text>
+        <circle cx="200" cy="200" r="110" fill="none" stroke="#7d848a" stroke-width="1.4"/>
+        <g transform="translate(200 188) scale(5.4) translate(-16 -16)"><circle cx="16" cy="16" r="11" fill="none" stroke="#2a2f33" stroke-width="3.6"/><rect x="1.5" y="13.6" width="29" height="4.8" rx=".6" fill="#2a2f33"/></g>
+        <text x="200" y="296" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="22" letter-spacing="5" fill="#3a4045">10 MON</text>
+      </svg>
+    </div>
+    <span class="tag">The stake / physical object</span><span class="num">07</span>
+  </section>
+
+  <!-- 8 image -->
+  <section class="p">
+    <div class="img"></div><div class="img dots" style="background:none"></div>
+    <span class="cap">Night side / city lights / no one is named</span>
+    <span class="tag" style="z-index:3">Image direction</span><span class="num" style="z-index:3">08</span>
+  </section>
+
+  <!-- 9 system -->
+  <section class="p">
+    <div class="sys">
+      <div class="chips">
+        <span class="chip"><i style="background:#3fd39a"></i>Proof verified</span>
+        <span class="chip"><i style="background:#ff6a45"></i>Violation</span>
+        <span class="chip"><i style="background:#f2b632"></i>Pending</span>
+      </div>
+      <div class="cmd"><s>$</s>pnpm add @quota/server @quota/slasher</div>
+      <div class="tickets">
+        <div class="tk"><span class="t"><i></i>Proof verified</span><span class="k">8<small>/40</small></span><span style="margin-top:8px">ember-index</span><span style="color:#8d9291">caller unknown</span></div>
+        <div class="tk"><span class="t"><i></i>Proof verified</span><span class="k">381<small>/500</small></span><span style="margin-top:8px">lantern-search</span><span style="color:#8d9291">caller unknown</span></div>
+        <div class="tk bad"><span class="t"><i></i>Violation</span><span class="k">7<small>/100</small></span><span style="margin-top:8px">lantern-search</span><span style="color:#ff8f72">key recovered</span></div>
+      </div>
+    <div style="display:flex;align-items:flex-end;gap:18px;margin-top:10px">
+        <svg width="80" height="80" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#0a0b0b" stroke="#2a2e30" stroke-width=".6"/><circle cx="16" cy="16" r="9" fill="none" stroke="#ececeb" stroke-width="3"/><rect x="4" y="14" width="24" height="4" rx=".5" fill="#ececeb"/></svg>
+        <svg width="64" height="64" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#ececeb"/><circle cx="16" cy="16" r="9" fill="none" stroke="#0a0b0b" stroke-width="3"/><rect x="4" y="14" width="24" height="4" rx=".5" fill="#0a0b0b"/></svg>
+        <svg width="40" height="40" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#0a0b0b" stroke="#2a2e30" stroke-width=".8"/><circle cx="16" cy="16" r="9" fill="none" stroke="#ececeb" stroke-width="3"/><rect x="4" y="14" width="24" height="4" rx=".5" fill="#ececeb"/></svg>
+        <svg width="24" height="24" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#0a0b0b" stroke="#2a2e30" stroke-width="1.2"/><circle cx="16" cy="16" r="9" fill="none" stroke="#ececeb" stroke-width="3"/><rect x="4" y="14" width="24" height="4" rx=".5" fill="#ececeb"/></svg>
+        <span style="font:500 12px var(--mono);color:var(--ink-3);letter-spacing:.06em;margin-left:6px;padding-bottom:4px">APP ICON · 80 / 64 / 40 / 24</span>
+      </div>
+    </div>
+    <span class="tag">System detail</span><span class="num">09</span>
+  </section>
+
+</div>
+</body>
+</html>
