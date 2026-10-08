@@ -18,7 +18,7 @@ function loadTexture(url: string, anisotropy: number) {
 export function createGlobe(canvas: HTMLCanvasElement) {
   // no MSAA: on an integrated GPU 4x samples over a 90vw canvas cost more than the soft limb ever shows
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true, powerPreference: "high-performance" });
-  const PR = (level: number) => [Math.min(window.devicePixelRatio || 1, 1.25), 1, 0.8][level] ?? 0.8; // level 0 is full quality; Story steps down only if frames run slow
+  const PR = (level: number) => ([Math.min(window.devicePixelRatio || 1, 1.25), 1, 0.8][level] ?? 0.8) * 0.8; // the canvas is 125vw: 0.8 keeps the pixel count near what 90vw had // level 0 is full quality; Story steps down only if frames run slow
   renderer.setPixelRatio(PR(0));
   // a hint only (renderer strings are often masked): integrated GPUs start at the lighter level, the governor in Story decides the rest
   const gx = renderer.getContext(), dbg = gx.getExtension("WEBGL_debug_renderer_info");

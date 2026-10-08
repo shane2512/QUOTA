@@ -8,7 +8,7 @@ import dynamic from "next/dynamic";
 import { EARTH } from "./earth";
 
 // the starfield (ogl + shader) loads after first paint, off the critical path
-const Galaxy = dynamic(() => import("./Galaxy"), { ssr: false });
+const Stars = dynamic(() => import("./Stars"), { ssr: false });
 
 // The earth starts loading with the page: three.js begins downloading as soon as this module runs in the browser
 // (in parallel with hydration), and the textures are preloaded from the document head (see Story below).
@@ -94,6 +94,7 @@ export default function Story() {
     let dead = false;
     let tlRef: gsap.core.Timeline | null = null; // read by the late-loading globe to start in the right state
     let governRef: ((t: number, dt: number) => void) | null = null;
+    let warmId = 0;
     try { quality.current = Math.min(2, Number(sessionStorage.getItem("quota:q")) || 0); } catch { /* ignore */ }
 
     const ctx = gsap.context(() => {
@@ -171,6 +172,15 @@ export default function Story() {
           try { sessionStorage.setItem("quota:q", String(quality.current)); } catch { /* private mode: it just re-measures */ }
         }
       };
+      /* Pre-raster. The coin and the ticket wall start hidden, and the browser never paints what is hidden, so their first
+         reveal mid-scroll costs a 100-250 ms stall. Paint them once, at 1% opacity for two frames, while the page is idle. */
+      warmId = window.setTimeout(() => {
+        if (tl.progress() > 0.2) return;
+        const els = [wall, q(".st-coin-wrap")[0] as HTMLElement];
+        const prev = els.map((e) => [e.style.opacity, e.style.visibility]);
+        els.forEach((e) => { e.style.visibility = "visible"; e.style.opacity = "0.012"; });
+        requestAnimationFrame(() => requestAnimationFrame(() => els.forEach((e, i) => { e.style.opacity = prev[i][0]; e.style.visibility = prev[i][1]; })));
+      }, 3200);
       gsap.ticker.add(govern);
       governRef = govern;
       const hero = q(".st-hero")[0] as HTMLElement;
@@ -227,14 +237,14 @@ export default function Story() {
     });
     const onResize = () => globe?.resize();
     window.addEventListener("resize", onResize);
-    return () => { dead = true; window.removeEventListener("resize", onResize); if (governRef) gsap.ticker.remove(governRef); ctx.revert(); globe?.dispose(); };
+    return () => { dead = true; window.removeEventListener("resize", onResize); if (governRef) gsap.ticker.remove(governRef); window.clearTimeout(warmId); ctx.revert(); globe?.dispose(); };
   }, []);
 
   return (
     <section className="st" ref={root} aria-label="How QUOTA works">
       <div className="st-stage">
         <div className="st-stars" aria-hidden="true">
-          <Galaxy run={starsOn} level={quality} dpr={0.6} mouseInteraction={false} density={1.1} glowIntensity={0.12} saturation={0} hueShift={220} twinkleIntensity={0.4} rotationSpeed={0.012} starSpeed={0.12} speed={0.5} />
+          <Stars run={starsOn} />
         </div>
         <div className="st-wall" aria-hidden="true">
           <div className="st-cyl">
