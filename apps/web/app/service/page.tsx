@@ -115,10 +115,10 @@ export default function Service() {
           </dl>
           <h3 className="h3" style={{ margin: "32px 0 8px" }}>Protect your own API</h3>
           <p className="small">A service is configured in code, not here. The limit per epoch is whatever stake each agent put up; you choose a minimum by rejecting proofs from the registry you do not accept.</p>
-          <pre className="mono small" style={{ whiteSpace: "pre-wrap", margin: "8px 0 0" }}>{`app.use(quotaExpress(new QuotaVerifier({
+          <pre className="code" style={{ marginTop: 12 }}><code>{`app.use(quotaExpress(new QuotaVerifier({
   serverId: "my-api",
   vkey, roots: new RegistryRootChecker(client, REGISTRY),
-})));`}</pre>
+})));`}</code></pre>
           <p className="small" style={{ marginTop: 8 }}>See the <a href="/docs">docs</a> for the 10-minute quickstart.</p>
         </section>
       </div>
