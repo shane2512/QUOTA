@@ -83,15 +83,18 @@ export default function Story() {
   Object.values(EARTH.high).forEach((href) => preload(href, { as: "fetch", crossOrigin: "anonymous" }));
   const root = useRef<HTMLDivElement>(null);
   const starsOn = useRef(true); // the starfield stops drawing once it has faded out
+  const quality = useRef(0); // 0 full, 1 and 2 cheaper; only ever stepped down, so it cannot flicker
 
   useLayoutEffect(() => {
     const el = root.current;
     if (!el) return;
     const q = gsap.utils.selector(el);
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let globe: { set: (v: { dim?: number; spin?: number }) => void; resize: () => void; dispose: () => void } | null = null;
+    let globe: { set: (v: { dim?: number; spin?: number }) => void; resize: () => void; weak: boolean; quality: (l: number) => void; dispose: () => void } | null = null;
     let dead = false;
     let tlRef: gsap.core.Timeline | null = null; // read by the late-loading globe to start in the right state
+    let governRef: ((t: number, dt: number) => void) | null = null;
+    try { quality.current = Math.min(2, Number(sessionStorage.getItem("quota:q")) || 0); } catch { /* ignore */ }
 
     const ctx = gsap.context(() => {
       const coin = q(".st-coin")[0], cyl = q(".st-cyl")[0] as HTMLElement, wall = q(".st-wall")[0] as HTMLElement;
@@ -115,7 +118,7 @@ export default function Story() {
         for (let i = 0; i < tiles.length; i++) {
           const a = (tiles[i].dataset.a as unknown as number) * 1;
           const c = Math.cos(((a + cylS.ry) * Math.PI) / 180);
-          const o = Math.round(Math.min(1, Math.max(0, (c - 0.08) / 0.4)) * 50) / 50; // quantised: only write on real change
+          const o = Math.round(Math.min(1, Math.max(0, (c - 0.08) / 0.4)) * 20) / 20; // quantised: only write on real change
           if (o !== op[i]) { op[i] = o; tiles[i].style.opacity = String(o); tiles[i].style.visibility = o > 0 ? "visible" : "hidden"; }
         }
       };
@@ -152,6 +155,24 @@ export default function Story() {
           invalidateOnRefresh: true, onRefresh: () => { layout(); paintWall(); } },
       });
       tlRef = tl;
+
+      /* Quality governor. Average the real frame time while the scene is on screen (idle or scrolling, after the first
+         2.5 s of loading); two slow windows in a row (under ~43 fps) step the quality down one level for this session.
+         Strong GPUs never trip it, and it never steps back up, so it cannot flicker. */
+      const born = performance.now();
+      let acc = 0, n = 0, slow = 0;
+      const govern = (_t: number, dt: number) => {
+        if (document.hidden || dt > 120 || performance.now() - born < 2500 || tl.progress() > 0.97) { acc = 0; n = 0; return; }
+        acc += dt; n++;
+        if (n < 24) return;
+        slow = acc / n > 23 ? slow + 1 : 0; acc = 0; n = 0;
+        if (slow >= 2 && quality.current < 2) {
+          slow = 0; quality.current++; globe?.quality(quality.current);
+          try { sessionStorage.setItem("quota:q", String(quality.current)); } catch { /* private mode: it just re-measures */ }
+        }
+      };
+      gsap.ticker.add(govern);
+      governRef = govern;
       const hero = q(".st-hero")[0] as HTMLElement;
       tl
         // 1. copy lifts, the earth rises into frame
@@ -202,18 +223,18 @@ export default function Story() {
     // the globe module was requested at page start; create it the moment it lands. The page works without it.
     void (globeModule ?? import("./globe")).then(({ createGlobe }) => {
       if (dead) return;
-      try { globe = createGlobe(el.querySelector(".st-globe canvas") as HTMLCanvasElement); globe.set({ dim: (tlRef?.time() ?? 0) < 4.2 ? 1 : 0 }); } catch { /* no WebGL: the copy still reads */ }
+      try { globe = createGlobe(el.querySelector(".st-globe canvas") as HTMLCanvasElement); if (globe.weak && quality.current < 1) quality.current = 1; globe.quality(quality.current); globe.set({ dim: (tlRef?.time() ?? 0) < 4.2 ? 1 : 0 }); } catch { /* no WebGL: the copy still reads */ }
     });
     const onResize = () => globe?.resize();
     window.addEventListener("resize", onResize);
-    return () => { dead = true; window.removeEventListener("resize", onResize); ctx.revert(); globe?.dispose(); };
+    return () => { dead = true; window.removeEventListener("resize", onResize); if (governRef) gsap.ticker.remove(governRef); ctx.revert(); globe?.dispose(); };
   }, []);
 
   return (
     <section className="st" ref={root} aria-label="How QUOTA works">
       <div className="st-stage">
         <div className="st-stars" aria-hidden="true">
-          <Galaxy run={starsOn} dpr={0.6} mouseInteraction={false} density={1.1} glowIntensity={0.12} saturation={0} hueShift={220} twinkleIntensity={0.4} rotationSpeed={0.012} starSpeed={0.12} speed={0.5} />
+          <Galaxy run={starsOn} level={quality} dpr={0.6} mouseInteraction={false} density={1.1} glowIntensity={0.12} saturation={0} hueShift={220} twinkleIntensity={0.4} rotationSpeed={0.012} starSpeed={0.12} speed={0.5} />
         </div>
         <div className="st-wall" aria-hidden="true">
           <div className="st-cyl">

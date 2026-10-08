@@ -16,13 +16,18 @@ function loadTexture(url: string, anisotropy: number) {
 }
 
 export function createGlobe(canvas: HTMLCanvasElement) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); // the canvas is 90vw square: fill cost, not detail, is the limit
+  // no MSAA: on an integrated GPU 4x samples over a 90vw canvas cost more than the soft limb ever shows
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true, powerPreference: "high-performance" });
+  const PR = (level: number) => [Math.min(window.devicePixelRatio || 1, 1.25), 1, 0.8][level] ?? 0.8; // level 0 is full quality; Story steps down only if frames run slow
+  renderer.setPixelRatio(PR(0));
+  // a hint only (renderer strings are often masked): integrated GPUs start at the lighter level, the governor in Story decides the rest
+  const gx = renderer.getContext(), dbg = gx.getExtension("WEBGL_debug_renderer_info");
+  const weak = /Intel\(R\) (UHD|HD|Iris)|Radeon\(TM\) Graphics|Radeon Graphics|Vega|Mali|Adreno|SwiftShader/i.test(dbg ? String(gx.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : "");
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
   camera.position.set(0, 0, 4.55);
 
-  const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const aniso = Math.min(2, renderer.capabilities.getMaxAnisotropy()); // a sphere seen face-on needs little; 8x doubled the texture reads
   let loaded = 0, disposed = false;
   let dayTex: THREE.Texture | null = null, nightTex: THREE.Texture | null = null;
   const use = (day: THREE.Texture, night: THREE.Texture) => {
@@ -111,6 +116,8 @@ export function createGlobe(canvas: HTMLCanvasElement) {
       if (!running && dim <= 0.002) draw(); // paint the final dark frame once
     },
     resize,
+    weak,
+    quality(level: number) { renderer.setPixelRatio(PR(level)); resize(); },
     dispose() {
       running = false; cancelAnimationFrame(raf); io.disconnect();
       document.removeEventListener("visibilitychange", sync);

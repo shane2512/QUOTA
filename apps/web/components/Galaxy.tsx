@@ -89,11 +89,15 @@ vec3 StarLayer(vec2 uv) {
       float grn = min(red, blu) * seed;
       vec3 base = vec3(red, grn, blu);
 
-      float hue = atan(base.g - base.r, base.b - base.r) / (2.0 * 3.14159) + 0.5;
-      hue = fract(hue + uHueShift / 360.0);
-      float sat = length(base - vec3(dot(base, vec3(0.299, 0.587, 0.114)))) * uSaturation;
       float val = max(max(base.r, base.g), base.b);
-      base = hsv2rgb(vec3(hue, sat, val));
+      if (uSaturation > 0.0) { // at zero saturation hsv2rgb is just vec3(val): skip atan/hsv for every star
+        float hue = atan(base.g - base.r, base.b - base.r) / (2.0 * 3.14159) + 0.5;
+        hue = fract(hue + uHueShift / 360.0);
+        float sat = length(base - vec3(dot(base, vec3(0.299, 0.587, 0.114)))) * uSaturation;
+        base = hsv2rgb(vec3(hue, sat, val));
+      } else {
+        base = vec3(val);
+      }
 
       vec2 pad = vec2(tris(seed * 34.0 + uTime * uSpeed / 10.0), tris(seed * 38.0 + uTime * uSpeed / 30.0)) - 0.5;
       float star = Star(gv - offset - pad, flareSize);
@@ -165,6 +169,8 @@ type Props = {
   run?: { current: boolean };
   /** internal resolution; below 1 trades sharpness for fill cost */
   dpr?: number;
+  /** 0 = full; 1 and 2 lower the resolution and cap the frame rate at 30 */
+  level?: { current: number };
 } & React.HTMLAttributes<HTMLDivElement>;
 
 export default function Galaxy({
@@ -185,6 +191,7 @@ export default function Galaxy({
   autoCenterRepulsion = 0,
   transparent = true,
   run,
+  level,
   dpr = 1,
   ...rest
 }: Props) {
@@ -241,9 +248,14 @@ export default function Galaxy({
 
     const mesh = new Mesh(gl, { geometry: new Triangle(gl), program });
     let animateId = 0;
+    let lastDraw = 0, applied = 0;
     const update = (t: number) => {
       animateId = requestAnimationFrame(update);
       if (run && !run.current) return;
+      const lv = level?.current ?? 0;
+      if (lv !== applied) { applied = lv; renderer.dpr = dpr * [1, 0.83, 0.67][lv]!; resize(); }
+      if (lv > 0 && t - lastDraw < 30) return; // slow GPU: ~30 fps is invisible on stars this slow and halves the shader cost
+      lastDraw = t;
       if (!disableAnimation) {
         program.uniforms.uTime.value = t * 0.001;
         program.uniforms.uStarSpeed.value = (t * 0.001 * starSpeed) / 10.0;
