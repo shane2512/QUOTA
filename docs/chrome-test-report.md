@@ -2,7 +2,7 @@
 
 Fill this in while running [`chrome-test-plan.md`](chrome-test-plan.md). **PASS only if you saw it work yourself.** Use BLOCKED (with the reason) for anything you could not run.
 
-- Tester:
+- Tester: Claude Code (agent), partial run 2026-10-09: CLI C1–C4 and HTTP-level checks only. Chrome extension was not connected, so every visual P/S/O check is still NOT RUN; O and X2–X5 need a human (Privy email code + hardware passkey).
 - Date:
 - Chrome version / OS / passkey device:
 - Production deployment tested (commit or URL):
@@ -24,7 +24,7 @@ Fill this in while running [`chrome-test-plan.md`](chrome-test-plan.md). **PASS 
 | S4 | NOT RUN | | |
 | S5 | NOT RUN | | |
 | S6 | NOT RUN | | |
-| S7 | NOT RUN | | |
+| S7 | PASS (HTTP) | `/api/service` keys: at, chain, chainError, feed, feedError; chain = registry, block, leaves 4 (2 active, 2 removed), balance 0.9 MON, burned 0.25 MON; no secrets | curl, not Chrome; feed null (no demo server hosted) |
 | O1 | NOT RUN | | |
 | O2 | NOT RUN | | |
 | O3 | NOT RUN | | |
@@ -59,19 +59,19 @@ Fill this in while running [`chrome-test-plan.md`](chrome-test-plan.md). **PASS 
 | O32 | NOT RUN | | |
 | O33 | NOT RUN | | |
 | O34 | NOT RUN | | |
-| X1 | NOT RUN | | |
+| X1 | PASS (HTTP) | `curl /api/operator/me` → 401 `{"error":"log in first"}` (2026-10-09) | checked with curl, not in Chrome |
 | X2 | NOT RUN | | |
 | X3 | NOT RUN | | |
 | X4 | NOT RUN | | |
 | X5 | NOT RUN | | |
-| X6 | NOT RUN | | |
-| X7 | NOT RUN | | |
+| X6 | PASS (HTTP) | POST `/api/operator/relay` without auth → 401 | curl, not Chrome |
+| X7 | PASS (HTTP) | POST relay with `Bearer abc` → 401 "invalid or expired session; log in again" | curl, not Chrome |
 | X8 | NOT RUN | | |
 | X9 | NOT RUN | | |
-| C1 | NOT RUN | | |
-| C2 | NOT RUN | | |
-| C3 | NOT RUN | | |
-| C4 | NOT RUN | | |
+| C1 | PASS | `pnpm typecheck` 0 errors (2026-10-09) | macOS |
+| C2 | PASS | core 12, client 3, slasher 3, server 10, wallets 3, demo-mcp 2, scout 4, web 6 | matches plan |
+| C3 | PASS | forge 89 passed | |
+| C4 | PASS | `pnpm scan:secrets` ALL CLEAR (10 values, 64 commits) | |
 | C5 | NOT RUN | | |
 | C6 | NOT RUN | | |
 | C7 | NOT RUN | | |
