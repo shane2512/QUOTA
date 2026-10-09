@@ -53,7 +53,7 @@ await check("personal_sign(QUOTA/rln-secret/v1/1) (identity rotation)", true, as
 await check("personal_sign(other message)", false, () => w.signMessage("transfer everything"));
 await check(`signTransaction → registry, chain ${chainId}, value 0.03`, true, async () => `signer ${await signer(tx({ value: 30_000_000_000_000_000n }))}`);
 await check("signTransaction → other contract", false, () => signer(tx({ to: "0x000000000000000000000000000000000000dEaD" })));
-const cap = BigInt(process.env.PRIVY_VALUE_CAP_WEI || "100000000000000000");
+const cap = BigInt(process.env.PRIVY_VALUE_CAP_WEI || "1000000000000000000"); // 1 MON, the cap of the current policy (v3 unit is 0.1 MON)
 await check(`signTransaction → registry, value at the cap (${cap} wei)`, true, async () => `signer ${await signer(tx({ value: cap }))}`);
 await check("signTransaction → registry, value cap + 1 wei", false, () => signer(tx({ value: cap + 1n })));
 await check("signTransaction → registry, other chain", false, () => signer(tx({ chainId: dev ? 10143 : 1 })));

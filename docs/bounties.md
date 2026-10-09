@@ -26,7 +26,12 @@ Remove-it test: without Privy we would have to build agent key custody, a policy
 
 Not claimed: Privy does not "verify the human"; the operator's passkey and the stake do the custody work. The positive login path in the browser is to be confirmed by the Chrome test plan (O4–O8).
 
-## Dynamic — used on the service side (claimed, with limits)
+## Dynamic — used on the service side (claimed, live in the deployed app)
+
+**Live now (2026-10-09):** the deployed demo server on Render (`https://quota-demo-mcp.onrender.com`, Linux) slashes through a **Dynamic server wallet**, `0x32b55C25a84c7916152851f862b46EBbED1c4A47`, and holds no raw private key. Judges can see it on `/service` ("Slasher wallet: Dynamic server wallet"). Evidence: a deliberate cheat against the live server produced two violations and an on-chain slash whose commit (`0xb572efbc…41f6`, block 69505362) and reveal (`0x988136f7…a01c`, block 69505393) were both sent from that wallet and succeeded. Details in `HANDOFF.md` §0c.
+
+Older detail follows (earlier Dynamic wallets and slashes).
+
 
 - **What:** the slasher's wallet is a **Dynamic server wallet** (`TWO_OF_TWO` MPC; our side holds no key share, the external share is backed up to Dynamic under a password). It signs the `commitSlash` and `revealSlash` transactions and **receives the reward**. Sign-only; we broadcast.
 - **Evidence:** a slash executed through it on Monad (v3: commit `0xf99d556a…e5f1`, reveal `0x52cd4a80…84c9`, slasher net **+0.0454 MON** after gas), and a cheating agent slashed through the demo MCP server. The adapter retries slow MPC signatures; Dynamic's signing was intermittently slow on testnet.

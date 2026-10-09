@@ -42,6 +42,7 @@ const feed = new Feed(); // live data for the service console, served at GET /fe
 
 // ---- optional slasher
 let slasher: Slasher | undefined;
+let slasherInfo: { provider: "dynamic" | "local"; address: string } | undefined; // published on /feed and /health (public address only)
 if (process.env.QUOTA_SLASH === "1") {
   let wallet: WalletAdapter;
   if (process.env.DYNAMIC_SLASHER_WALLET) {
@@ -54,6 +55,7 @@ if (process.env.QUOTA_SLASH === "1") {
     d.onRetry = (n, err) => console.log(`[slash] dynamic sign attempt ${n} failed (${err.slice(0, 80)}); retrying`);
     wallet = d;
   } else wallet = new LocalKeyWallet(need("SLASHER_PRIVATE_KEY") as Hex);
+  slasherInfo = { provider: process.env.DYNAMIC_SLASHER_WALLET ? "dynamic" : "local", address: wallet.address };
   console.log(`[slash] slasher wallet ${wallet.address} (${process.env.DYNAMIC_SLASHER_WALLET ? "Dynamic server wallet" : "local key"})`);
   const tx = new Broadcaster(chain, wallet, { maxFeePerGas: process.env.QUOTA_MAX_FEE_GWEI ? BigInt(process.env.QUOTA_MAX_FEE_GWEI) * 1_000_000_000n : undefined });
   slasher = new Slasher({
@@ -151,9 +153,9 @@ app.use(express.json());
 // Public, read-only: short nullifiers, statuses and tx hashes only (see feed.ts).
 app.get("/feed", (_req, res) => {
   res.setHeader("access-control-allow-origin", "*");
-  res.json({ serverId: SERVER_ID, registry, slashing: !!slasher, epochSeconds: Number(process.env.QUOTA_EPOCH_SECONDS || 3600), ...feed.snapshot() });
+  res.json({ serverId: SERVER_ID, registry, slashing: !!slasher, slasher: slasherInfo, epochSeconds: Number(process.env.QUOTA_EPOCH_SECONDS || 3600), ...feed.snapshot() });
 });
-app.get("/health", (_req, res) => void res.json({ ok: true, serverId: SERVER_ID, registry, slashing: !!slasher }));
+app.get("/health", (_req, res) => void res.json({ ok: true, serverId: SERVER_ID, registry, slashing: !!slasher, slasher: slasherInfo }));
 app.get("/api/search", quotaExpress(verifier), async (req, res) => {
   res.json(await wikipedia(String(req.query.q ?? ""), 5));
 });

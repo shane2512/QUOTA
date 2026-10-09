@@ -8,7 +8,7 @@ type Chain = {
 };
 type Row = { t: number; status: string; nullifier?: string };
 type Slash = { t: number; idCommitment: string; status: string; commit?: string; reveal?: string };
-type Feed = { serverId: string; slashing: boolean; epochSeconds: number; startedAt: number; counts: Record<string, number>; rows: Row[]; slashes: Slash[] };
+type Feed = { serverId: string; slashing: boolean; slasher?: { provider: "dynamic" | "local"; address: string }; epochSeconds: number; startedAt: number; counts: Record<string, number>; rows: Row[]; slashes: Slash[] };
 type Data = { chain: Chain | null; chainError: string | null; feed: Feed | null; feedError: string | null };
 
 const mon = (wei: string | bigint, dp = 3) => (Number(wei) / 1e18).toFixed(dp);
@@ -111,6 +111,12 @@ export default function Service() {
             <div><dt>Stake per message</dt><dd>{c ? `${mon(c.unitWei, 2)} MON` : "—"}</dd></div>
             <div><dt>Slash share to the slasher</dt><dd>{c ? `${c.shareBps / 100}% (rest locked)` : "—"}</dd></div>
             <div><dt>Slashing on this server</dt><dd>{f ? (f.slashing ? "on" : "off") : "—"}</dd></div>
+            {f?.slasher && (
+              <div>
+                <dt>Slasher wallet</dt>
+                <dd>{f.slasher.provider === "dynamic" ? "Dynamic server wallet" : "Local key"}{" "}<a href={`https://testnet.monadvision.com/address/${f.slasher.address}`} target="_blank" rel="noreferrer" className="mono">{f.slasher.address.slice(0, 6)}…{f.slasher.address.slice(-4)}</a></dd>
+              </div>
+            )}
             <div><dt>Violations seen</dt><dd className="tnum">{f ? violations : "—"}</dd></div>
           </dl>
           <h3 className="h3" style={{ margin: "32px 0 8px" }}>Protect your own API</h3>

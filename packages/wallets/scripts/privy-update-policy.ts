@@ -7,7 +7,7 @@ import { updateAgentPolicy } from "../src/privy.ts";
 
 process.loadEnvFile(fileURLToPath(new URL("../../../.env", import.meta.url)));
 const privy = new PrivyClient({ appId: process.env.PRIVY_APP_ID!, appSecret: process.env.PRIVY_APP_SECRET! });
-const cap = BigInt(process.env.PRIVY_VALUE_CAP_WEI || "100000000000000000");
+const cap = BigInt(process.env.PRIVY_VALUE_CAP_WEI || "1000000000000000000");
 const targets = [
   { id: process.env.PRIVY_AGENT_POLICY_ID, registry: process.env.QUOTA_REGISTRY_ADDRESS as Address, chainId: 10143 },
   { id: process.env.PRIVY_DEV_AGENT_POLICY_ID, registry: (process.env.DEV_QUOTA_REGISTRY_ADDRESS || "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0") as Address, chainId: 31337 },
