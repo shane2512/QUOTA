@@ -16,6 +16,7 @@ export default function Footer() {
           <Link href="/demo">Live demo</Link>
           <Link href="/operator">Operator console</Link>
           <Link href="/service">Service console</Link>
+          <Link href="/slasher">Delegate your slasher</Link>
         </div>
         <div>
           <h4>Build</h4>

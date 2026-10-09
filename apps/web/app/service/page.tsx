@@ -8,7 +8,7 @@ type Chain = {
 };
 type Row = { t: number; status: string; nullifier?: string };
 type Slash = { t: number; idCommitment: string; status: string; commit?: string; reveal?: string };
-type Feed = { serverId: string; slashing: boolean; slasher?: { provider: "dynamic" | "local"; address: string }; epochSeconds: number; startedAt: number; counts: Record<string, number>; rows: Row[]; slashes: Slash[] };
+type Feed = { serverId: string; slashing: boolean; slasher?: { provider: "dynamic" | "dynamic-delegated" | "local"; address: string }; epochSeconds: number; startedAt: number; counts: Record<string, number>; rows: Row[]; slashes: Slash[] };
 type Data = { chain: Chain | null; chainError: string | null; feed: Feed | null; feedError: string | null };
 
 const mon = (wei: string | bigint, dp = 3) => (Number(wei) / 1e18).toFixed(dp);
@@ -114,7 +114,7 @@ export default function Service() {
             {f?.slasher && (
               <div>
                 <dt>Slasher wallet</dt>
-                <dd>{f.slasher.provider === "dynamic" ? "Dynamic server wallet" : "Local key"}{" "}<a href={`https://testnet.monadvision.com/address/${f.slasher.address}`} target="_blank" rel="noreferrer" className="mono">{f.slasher.address.slice(0, 6)}…{f.slasher.address.slice(-4)}</a></dd>
+                <dd>{f.slasher.provider === "dynamic-delegated" ? "Delegated Dynamic wallet (operator-owned)" : f.slasher.provider === "dynamic" ? "Dynamic server wallet" : "Local key"}{" "}<a href={`https://testnet.monadvision.com/address/${f.slasher.address}`} target="_blank" rel="noreferrer" className="mono">{f.slasher.address.slice(0, 6)}…{f.slasher.address.slice(-4)}</a></dd>
               </div>
             )}
             <div><dt>Violations seen</dt><dd className="tnum">{f ? violations : "—"}</dd></div>

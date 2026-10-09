@@ -8,6 +8,7 @@ if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 const pub = {
   NEXT_PUBLIC_REGISTRY_ADDRESS: process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || process.env.QUOTA_REGISTRY_ADDRESS,
   NEXT_PUBLIC_RP_ID: process.env.NEXT_PUBLIC_RP_ID || process.env.WEBAUTHN_RP_ID,
+  NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID: process.env.NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID || process.env.DYNAMIC_ENVIRONMENT_ID, // a public identifier by design
 };
 
 // The workspace packages are TypeScript source (no build step), so Next must compile them.

@@ -7,13 +7,15 @@
   "exports": {
     ".": "./src/index.ts",
     "./privy": "./src/privy.ts",
-    "./dynamic": "./src/dynamic.ts"
+    "./dynamic": "./src/dynamic.ts",
+    "./dynamic-delegated": "./src/dynamic-delegated.ts"
   },
   "scripts": {
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@dynamic-labs-wallet/node": "1.1.28",
     "@dynamic-labs-wallet/node-evm": "1.1.28",
     "@privy-io/node": "0.35.0",
     "@quota/client": "workspace:*",
