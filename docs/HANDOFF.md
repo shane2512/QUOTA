@@ -67,7 +67,42 @@ Live link: **https://quota-metro.vercel.app**. Test there, in Chrome, not on a p
 ### Flow 6: a real agent calls a protected service (optional, needs the repo) · C6–C10
 Run on your own machine with your own `.env`: `pnpm wallet-id <email A>`, put the id in `.env` as `PRIVY_AGENT_WALLET_ID`, enroll an agent with limit 3 on the live console, start the demo server and run the agent (exact commands in C7–C9). Expect three `OK` results, then a local refusal on the fourth. The cheat run (C10) slashes a **spare** identity; confirm the commit, reveal and `Slashed` event on the explorer.
 
+### Flow 7: the live demo server on Render, with a real slash · C7–C10
+The reference server is live at `https://quota-demo-mcp.onrender.com` (details in §0c). Everything below runs from the repo root with your own `.env`.
+1. **Probe it.** `/health` returns `{"ok":true,…,"slashing":true}`; `/feed` is public JSON; `GET /api/search?q=monad` with no proof returns `401 {"reason":"missing"}`.
+2. **Run an agent that passes.** Use an enrolled identity (the demo wallet has 0 and 1; yours comes from step 4). The first call after idle can take about a minute while Render wakes:
+   ```bash
+   cd apps/demo-mcp
+   QUOTA_SERVER_URL=https://quota-demo-mcp.onrender.com/mcp pnpm exec tsx src/agent.ts --identity 0 "Monad blockchain" "zero-knowledge proof"
+   ```
+   Expect `OK` per call, then `/service` shows the "streaming" pill and a green "verified" row each (short nullifier, never a caller).
+3. **See the limit.** One more call past the limit stops locally: `STOP … quota exhausted for this epoch`. Nothing reaches the server.
+4. **Run the agent you staked on the website.** `pnpm wallet-id <your email>` prints a wallet id; pass it for one command only (do not edit `.env`):
+   ```bash
+   PRIVY_AGENT_WALLET_ID=<id> QUOTA_SERVER_URL=https://quota-demo-mcp.onrender.com/mcp pnpm exec tsx src/agent.ts --identity 0 "Monad blockchain"
+   ```
+   `--identity` is the slot number shown in `/operator`.
+5. **Show a violation and a real slash.** Add `--cheat` to the same command with 3 queries. The first call passes, the next two come back `REJECTED (violation, 429)`, and within about 20 seconds `/service` shows a "slashed" row with commit and reveal links (open both on the explorer: `success`). **This permanently burns that identity and its stake**, so use a spare one: enroll it with `pnpm --filter @quota/wallets exec tsx scripts/enroll-privy-agent.ts --identity <n> --limit 1` (spends about 0.55 MON from the deployer).
+
 **If something fails:** note the step, the Chrome version, the Console error and any transaction hash in the report. Do not change contracts or the registry address.
+
+## 0c. Render deployment (demo server)
+
+| | |
+|---|---|
+| URL | `https://quota-demo-mcp.onrender.com` (`/health`, `/feed`, `/api/search`, `POST /mcp`) |
+| Service | `quota-demo-mcp`, id `srv-db47i4u0tbcc73ddugng`, free plan, Oregon, Node 22.13.1, deploys from `main` on every push |
+| Dashboard | `https://dashboard.render.com/web/srv-db47i4u0tbcc73ddugng` |
+| Build | `npm install -g pnpm@11.25.0 && pnpm install --frozen-lockfile --prod=false --filter @quota/demo-mcp...` (Corepack fails signature checks on Render) |
+| Start | `pnpm --filter @quota/demo-mcp start`; health check `/health` |
+| Env | `MONAD_RPC_URL` (public testnet RPC), `QUOTA_REGISTRY_ADDRESS`, `QUOTA_SERVER_ID=demo-mcp.quota`, `QUOTA_SLASH=1`, `QUOTA_MAX_FEE_GWEI=120`, `SLASHER_PRIVATE_KEY` (secret; the slasher wallet `0xb7B8…237f`, testnet funds only, about 4 MON) |
+| Vercel | `FEED_URL=https://quota-demo-mcp.onrender.com/feed` feeds the `/service` page |
+
+Limits you will hit: the free plan sleeps after about 15 minutes idle (the first request takes about a minute) and the nullifier database resets on every restart, so replay memory starts empty. A violation is only detected when both requests land in the same server run.
+
+Operations: `render deploys create srv-db47i4u0tbcc73ddugng` redeploys; `render logs --resources srv-db47i4u0tbcc73ddugng` reads logs. Changing an env var does not redeploy by itself; trigger one. `render services update --health-check-path` does not persist in CLI v2.15.0 (and Git Bash rewrites a leading `/` into a Windows path): use `PATCH /v1/services/{id}` with the API key from `~/.render/cli.yaml`.
+
+Verified on 2026-10-09 (Monad testnet): 5 real proofs verified through the Render server, a limit-1 website agent (wallet `0x7a99…f860`, identity 0) refused locally on its second call, then a deliberate `--cheat` run: 2 violations (429) and a slash, commit `0x70c598930fe567179f90f43f833e50b0b4d33c3d82a70ad29e935c90e9e607aa` (block 69466222) and reveal `0x00a3d86d0e3163dd3b3bbfb67abd01370c0f427dd032254526ec0367c177c3f4` (block 69466242), both `success`; that agent's stake is now 0 and it can never re-enroll. Demo wallet identities: 0 (limit 3) and 1 (limit 2) active; 2 (limit 1) active but logged as a violation once before slashing was enabled, never slashed. Use identity 3 or higher for new runs.
 
 ## 1. What QUOTA is (one paragraph)
 Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An operator locks a stake (approved by a human passkey, verified on-chain via the P256 precompile at `0x100`); the agent joins a Merkle tree. Each request carries an RLN-v2 zero-knowledge proof of "I am a member and this is request k of my N this epoch". Reusing a request number leaks the agent's secret `a0` (Shamir two-point recovery); anyone with `a0` can slash the stake. No issuer. The primary output is a primitive (contracts, SDKs, middleware), not a consumer app.
@@ -421,10 +456,10 @@ Identities already used: 0 (index 7, Active, limit 5) and 1 (index 8, Slashed). 
 - **Commits:** local only. Six commits ahead of `origin/main` at the end of this session (Phase 5 + Phase 7); nothing pushed.
 
 ## 9. What to do next
-See §0 for the order. In short: (1) Chrome test of every function, (2) fix what fails, (3) videos, (4) submission. Deferred by the owner: the Qwen run and article (no key), the demo server host (Render, parked). Without a reachable demo server, the deployed `/service` request feed shows "demo server offline" (chain data is still live); record the video with the local web + local demo server described in `demo-video-script.md`.
+See §0 for the order. In short: (1) Chrome test of every function, (2) fix what fails, (3) videos, (4) submission. Deferred by the owner: the Qwen run and article (no key). The demo server is deployed on Render (§0c), so the deployed `/service` shows a live request feed.
 
 ## 9b. Operator console (built 2026-10-07; real-browser test pending)
-- `apps/web/app/operator` (+ `lib/passkey-*.ts`, `lib/operator-server.ts`, `/api/operator/{me,relay}`): Privy email login, a real WebAuthn passkey, one user-owned Privy wallet per user as the on-chain operator, relay of registerPasskey / enroll / topUp / requestUnstake / unstake. The live service console is `/service` (`/api/service`); its request feed needs `FEED_URL` (a reachable demo server's `/feed`; hosting on Render is parked).
+- `apps/web/app/operator` (+ `lib/passkey-*.ts`, `lib/operator-server.ts`, `/api/operator/{me,relay}`): Privy email login, a real WebAuthn passkey, one user-owned Privy wallet per user as the on-chain operator, relay of registerPasskey / enroll / topUp / requestUnstake / unstake. The live service console is `/service` (`/api/service`); its request feed reads `FEED_URL` (set in Vercel to `https://quota-demo-mcp.onrender.com/feed`).
 - Verified on Monad v3 without a browser by `apps/web/scripts/operator-e2e.mts` (software passkey, throwaway Privy user, spends ~0.9 MON). **Not yet verified: a real Privy login and hardware passkey on `https://quota-metro.vercel.app/operator`.** The passkey only works on that hostname (the registry's rpId is immutable); Privy accepts only that origin and `http://localhost:3000`.
 - Vercel production variables in use (all six are set): `NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_AUTH_PRIVATE_KEY`, `PRIVY_AUTH_KEY_QUORUM_ID`, `PRIVY_AGENT_POLICY_ID`. Optional: `OPERATOR_MAX_LIMIT` (default 20), `QUOTA_MAX_FEE_GWEI` (120), `MONAD_RPC_URL`, `FEED_URL`.
 - Each user needs about 0.1 MON per message of limit plus ~0.45 MON of gas in their operator wallet (shown in the UI with the address and a faucet link). The wallet's policy lets our key sign only registry calls (value ≤ 1 MON), so test MON sent to it cannot be swept by us.
@@ -444,7 +479,7 @@ The whole web app was restyled in one session; `DESIGN.md` is the source of trut
 
 ## 10. Open items needing the owner
 - **Qwen:** no key; deferred. Claim the bounty only if a real run and a published article happen (`bounties.md`).
-- **Demo server host:** Render was chosen but parked; needed for a live request feed on the deployed `/service` and for Scout/agent runs against a public server.
+- **Demo server host:** deployed on Render (§0c). Free plan: it sleeps after about 15 minutes idle (first call takes about a minute) and its nullifier database resets on every restart or deploy.
 - **Named external integrator with evidence** (a PR, a running URL, or a written message). The biggest gap for the traction score.
 - **Repo access** for `metropolis@hackathon.monad.xyz` (or confirm the repo is public); **community group** (or skip); **logo** (≤ 3 MB); team names for the pitch.
 - **Judge funding:** decide between "use the faucet" and pre-funded wallets (`pnpm fund`), and say so in the submission.
