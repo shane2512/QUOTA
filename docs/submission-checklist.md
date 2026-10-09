@@ -14,7 +14,7 @@ Deadline **14 Oct 2026, 09:29 IST**. Plan: submit the evening of **13 Oct**. Sta
 | Logo ≤ 3 MB (JPG/PNG/WEBP) | **Open** | Owner | Not made yet |
 | Track 4 selected | Ready | Owner | Description: [`bounties.md`](bounties.md) |
 | Privy bounty | **Claim** | Owner | Text in `bounties.md` |
-| Dynamic bounty | **Claim, with stated limits** | Owner | Server wallet only; delegated access not done; text in `bounties.md` |
+| Dynamic bounty | **Claim** | Owner | Server wallet (slasher) plus embedded wallet with delegated access (`/slasher`), both live; verified with on-chain slashes sent from the operator's embedded wallet; text in `bounties.md`; setup in `dynamic-delegation-setup.md` |
 | Qwen bounty | **Do not claim unless a real run + article happen** | Owner | No key/credits so far; article is a draft with pending sections |
 | Nansen, Cleanverse | **Cut** | — | Reasons in `gates.md` G5 / G4 |
 | Monad Community Team | **Owner decision** | Owner | Needs the community group on the portal profile |

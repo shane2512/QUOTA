@@ -106,6 +106,15 @@ Operations: `render deploys create srv-db47i4u0tbcc73ddugng` redeploys; `render 
 
 Verified on 2026-10-09 (Monad testnet): 5 real proofs verified through the Render server, a limit-1 website agent (wallet `0x7a99…f860`, identity 0) refused locally on its second call, then a deliberate `--cheat` run: 2 violations (429) and a slash, commit `0x70c598930fe567179f90f43f833e50b0b4d33c3d82a70ad29e935c90e9e607aa` (block 69466222) and reveal `0x00a3d86d0e3163dd3b3bbfb67abd01370c0f427dd032254526ec0367c177c3f4` (block 69466242), both `success`; that agent's stake is now 0 and it can never re-enroll. Demo wallet identities: 0 (limit 3) and 1 (limit 2) active; 2 slashed (see above). Use identity 3 or higher for new runs.
 
+### Dynamic delegated access (operator-owned slasher)
+
+Built and verified 2026-10-09. A service operator opens `https://quota-metro.vercel.app/slasher`, signs in with an email code (Dynamic embedded wallet) and approves delegation; slashes are then signed from that wallet and the reward lands there. Code: `packages/wallets/src/dynamic-delegated.ts`, `apps/demo-mcp/src/server.ts` (`POST /dynamic/webhook`), `apps/web/app/slasher/`. Setup and dashboard steps: [`dynamic-delegation-setup.md`](dynamic-delegation-setup.md).
+
+- **Env:** Render holds `DYNAMIC_WEBHOOK_SECRET` and `DYNAMIC_DELEGATION_PRIVATE_KEY` (the RSA private key, base64 PEM; the public half is in `docs/dynamic-delegation-public-key.pem` and in the Dynamic dashboard). Vercel holds `NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID`. Webhook URL in the dashboard: `https://quota-demo-mcp.onrender.com/dynamic/webhook` (events `wallet.delegation.created` and `.revoked`).
+- **Behaviour:** the latest approval wins; if the delegated wallet holds under 0.3 MON the server slasher is used instead; revoking returns to it. `/feed` and `/service` report which wallet slashes. Delegations live in memory plus an encrypted file, so after a Render deploy the operator must approve again.
+- **Verified:** Evidence on Monad testnet (2026-10-09), two slashes whose commit and reveal were both sent from the operator's embedded wallet `0x48726d79b26f12178069bDf8b98579F9A26AfF8C`: (1) identity 1, commit `0x79ab567bbf082323ffcbac25158a81a09089b15ca88574fd7407ebb0f796cd3d` (block 69525686), reveal `0x9e6df76cc59287fb97ac9cd5690adbf1c0cae91b37f435968c6abf9922b695c4` (block 69525709); (2) identity 2, commit `0x1b8bfb3ffcb30ea57b3b9137cc0e5dfb1dfe3f35dfa06b036c7f25d773334489` (block 69526418), reveal `0xeff5b83f68c86678096fbbd753348b81881e0bc1b26d35b87d5c9c75f0a3c268` (block 69526439). All four `success`. The operator's wallet paid about 0.2 MON of gas and received half of the forfeited stake, so with stakes of 0.1 to 0.2 MON a delegated slasher runs at a small loss; it breaks even from a limit of about 5 (0.5 MON staked).
+- **To demo it:** approve on `/slasher`, enroll a spare agent (limit 1) in `/operator`, then run flow 7 step 5 with `--identity <n>` for that wallet. Use identity 3 or higher on the console wallet `0x7a99…f860` (0 to 2 are slashed).
+
 ## 1. What QUOTA is (one paragraph)
 Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An operator locks a stake (approved by a human passkey, verified on-chain via the P256 precompile at `0x100`); the agent joins a Merkle tree. Each request carries an RLN-v2 zero-knowledge proof of "I am a member and this is request k of my N this epoch". Reusing a request number leaks the agent's secret `a0` (Shamir two-point recovery); anyone with `a0` can slash the stake. No issuer. The primary output is a primitive (contracts, SDKs, middleware), not a consumer app.
 
@@ -148,7 +157,7 @@ Anonymous, staked, slashable rate limits for AI-agent traffic on Monad. An opera
 ### Scope decisions already taken
 - **BTX does not exist for us** (organizers confirmed). Slash path is **commit–reveal only**; label it as the fallback, never as BTX.
 - **Cleanverse dropped** (gate failed). No Compliant tree.
-- **Dynamic**: only a server-wallet signing test passed; delegated access untested. Plan W3 as server wallet.
+- **Dynamic**: a server-wallet signing test passed in Phase 0; delegated access was untested then and is now done and verified (see §0c).
 - **Nansen**: `labels` works for Monad; `related-wallets`/`counterparties` need credits the owner does not have yet. Conditional.
 - **Qwen**: owner has not decided (credits / open-weight / drop). Keep the agent loop provider-agnostic.
 - Cut order if time runs out: Nansen → Dynamic. Never cut: passkey custody, RLN proofs, safe slash path, Privy, the demo agent, docs, demo video.
@@ -408,7 +417,7 @@ STOP  "overflow query": quota exhausted for this epoch (client refuses to reuse 
 **Service side (Dynamic):**
 - Server wallet `0x7d150c30971cb7aE8Bf5e9Ce6deb79a12D92Aee1`. Its share is backed up to Dynamic; we keep only the metadata and the password.
 - It signs commit and reveal, and receives the reward.
-- Delegated access was **not** done.
+- Delegated access was not done in Phase 5; it was added later (2026-10-09), see §0c.
 
 **Evidence** (txs in `deployments.md`):
 - `phase5-e2e` passes on Monad: Privy enroll → proofs → cheat → Dynamic slash, with the reward received.

@@ -29,9 +29,13 @@ Do these in order. The environment id is the one already in `.env` as `DYNAMIC_E
 4. Run the cheat demo (HANDOFF flow 7, step 5) on a spare identity. The commit and reveal transactions are sent **from your embedded wallet**, and half the stake arrives in it.
 5. Click **Revoke delegation**: the server goes back to its own Dynamic server wallet.
 
+## Verified
+
+Evidence on Monad testnet (2026-10-09), two slashes whose commit and reveal were both sent from the operator's embedded wallet `0x48726d79b26f12178069bDf8b98579F9A26AfF8C`: (1) identity 1, commit `0x79ab567bbf082323ffcbac25158a81a09089b15ca88574fd7407ebb0f796cd3d` (block 69525686), reveal `0x9e6df76cc59287fb97ac9cd5690adbf1c0cae91b37f435968c6abf9922b695c4` (block 69525709); (2) identity 2, commit `0x1b8bfb3ffcb30ea57b3b9137cc0e5dfb1dfe3f35dfa06b036c7f25d773334489` (block 69526418), reveal `0xeff5b83f68c86678096fbbd753348b81881e0bc1b26d35b87d5c9c75f0a3c268` (block 69526439). All four `success`. The operator's wallet paid about 0.2 MON of gas and received half of the forfeited stake, so with stakes of 0.1 to 0.2 MON a delegated slasher runs at a small loss; it breaks even from a limit of about 5 (0.5 MON staked).
+
 ## Limits, stated plainly
 
 - The delegation lives in the demo server's memory and an encrypted file (`delegations.enc.json`, key derived from `DYNAMIC_WALLET_PASSWORD`). Render's free plan resets its disk on each deploy, so after a deploy the operator must approve again. A database would remove that.
 - If the delegated wallet holds less than 0.3 MON (`QUOTA_DELEGATED_MIN_MON`), slashes fall back to the server's own Dynamic wallet and the log says so.
 - The latest delegation wins; there is one active delegated slasher at a time.
-- Not tested yet against a real Dynamic webhook: decryption and delegated signing need Dynamic's Linux-only native module, so they run only on Render. The signature check, parsing, encrypted store and wallet adapter are unit-tested here.
+- Decryption and delegated signing need Dynamic's Linux-only native module, so they only run on Render (and are verified there, see above). The signature check, parsing, encrypted store and wallet adapter are also unit-tested (`packages/wallets/test/dynamic-delegated.test.ts`).

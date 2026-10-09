@@ -74,7 +74,7 @@ Hosted `qwen3.8-max` is not free; key not set. The agent loop stays provider-agn
 | G0 chain/toolchain/Hello | PASS | none |
 | G1 BTX | FAIL (confirmed) | commit–reveal only; `btx` dropped |
 | G2 Privy | PASS (+ owner/policy/additional-signer path PASS in Phase 5) | keep |
-| G3 Dynamic | PARTIAL → server wallet PASS in Phase 5 (incl. live slash) | keep as server-wallet; delegated access still unproven |
+| G3 Dynamic | PARTIAL → server wallet PASS in Phase 5 (incl. live slash) | server wallet PASS; **delegated access PASS on 2026-10-09** (embedded wallet login, encrypted webhook, delegated slash from the operator wallet; see `bounties.md`) |
 | G4 Cleanverse | FAIL | dropped |
 | G5 Nansen | PARTIAL | conditional; labels only until credits |
 | G6 Qwen | DEFERRED | decide before Phase 7 |
@@ -98,4 +98,4 @@ Hosted `qwen3.8-max` is not free; key not set. The agent loop stays provider-agn
 - Caveats:
   - The Phase 0 wallet `0xb1E9…060a` cannot sign from here: its creation metadata (`externalServerKeySharesBackupInfo`) was not saved.
   - Signing is intermittently slow: one attempt timed out after 300 s (`FORWARD_MPC_TIMEOUT`, accelerator path), another after ~99 s, while other attempts took 7–10 s. The adapter disables the accelerator and retries up to 3×.
-  - **Delegated access is still not tested** and must not be claimed.
+  - Delegated access was untested here in Phase 5; it was built and verified later (2026-10-09), see `bounties.md` and `dynamic-delegation-setup.md`.

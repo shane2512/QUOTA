@@ -69,7 +69,7 @@ Residual:
 ## 5. Wallets (Privy and Dynamic)
 
 - **Privy agent wallet** is owned by the operator's Privy user; our runtime key is an additional signer under an override policy that allows only registry transactions on chain 10143, value ≤ 1 MON, and `personal_sign` of `QUOTA/rln-secret/v1…`. Policies are default-deny. Evidence: live policy check 11/11 (`privy-policy-check`), unit test of the rules.
-- **Dynamic slasher** is a server wallet (TWO_OF_TWO MPC, share backed up to Dynamic, password in `.env`). It signs commit/reveal and receives rewards. **Delegated access (embedded-wallet login) is not implemented.** The wallet password lives in `.env`; losing it strands the wallet (this already happened once, `deployments.md`).
+- **Dynamic slasher** is a server wallet (TWO_OF_TWO MPC, share backed up to Dynamic, password in `.env`). It signs commit/reveal and receives rewards. **Delegated access is also supported** (an operator can delegate slashing from their own Dynamic embedded wallet, `dynamic-delegation-setup.md`): QUOTA's server then holds revocable, signing-only rights, encrypted at rest, that cannot export the key or change the wallet's rules; a stolen server could sign slashes from that wallet (limited to what the slasher does) until the operator revokes. The wallet password lives in `.env`; losing it strands the wallet (this already happened once, `deployments.md`).
 - Both are used **sign-only**; broadcasting is ours. Contracts and SDK core import neither provider (providers are in `@quota/wallets`).
 - The Dynamic Node SDK needs Linux/macOS.
 
