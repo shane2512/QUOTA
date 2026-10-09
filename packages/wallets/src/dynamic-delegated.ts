@@ -161,11 +161,22 @@ export async function dynamicDelegatedApi(o: { environmentId: string; apiToken: 
     delegatedSignMessage(c: unknown, p: Record<string, unknown>): Promise<string>;
     delegatedSignTransaction(c: unknown, p: Record<string, unknown>): Promise<string>;
   };
-  const client = sdk.createDelegatedEvmWalletClient({ environmentId: o.environmentId, apiKey: o.apiToken });
+  // The client is long-lived on the server. After any failure build a fresh one, so a stale session or connection
+  // cannot make every retry fail the same way (the server-wallet path did exactly that, see dynamic.ts).
+  const make = () => sdk.createDelegatedEvmWalletClient({ environmentId: o.environmentId, apiKey: o.apiToken });
+  let client = make();
   const base = (d: Delegation) => ({ walletId: d.walletId, shareSetId: d.shareSetId, walletApiKey: d.walletApiKey, keyShare: d.keyShare });
+  const run = async <T>(f: (c: unknown) => Promise<T>): Promise<T> => {
+    try {
+      return await f(client);
+    } catch (e) {
+      client = make();
+      throw e;
+    }
+  };
   return {
-    signMessage: (d, message) => sdk.delegatedSignMessage(client, { ...base(d), message }),
-    signTransaction: (d, transaction) => sdk.delegatedSignTransaction(client, { ...base(d), transaction }),
+    signMessage: (d, message) => run((c) => sdk.delegatedSignMessage(c, { ...base(d), message })),
+    signTransaction: (d, transaction) => run((c) => sdk.delegatedSignTransaction(c, { ...base(d), transaction })),
   };
 }
 

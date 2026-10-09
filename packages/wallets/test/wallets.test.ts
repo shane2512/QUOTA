@@ -54,3 +54,42 @@ test("DynamicServiceWallet retries a failed MPC signature, then gives up after t
   await assert.rejects(down.signTransaction({ type: "eip1559", chainId: 1, nonce: 0, to: REG, gas: 1n, maxFeePerGas: 1n, maxPriorityFeePerGas: 1n }), /down/);
   assert.equal(JSON.stringify(w).includes("pw"), false, "password never serialized");
 });
+
+test("DynamicServiceWallet renews an expired Dynamic session: after a failure, and before signing once the session is old", async () => {
+  let authCalls = 0, sessionValid = true;
+  const client = {
+    authenticateApiToken: async () => { authCalls++; sessionValid = true; },
+    signTransaction: async () => {
+      if (!sessionValid) throw new Error("Session validation failed: 401 Unauthorized");
+      return "0x02ab";
+    },
+  };
+  const meta = { accountAddress: "0x0000000000000000000000000000000000000002" };
+  // built with a token, as connect() does (the constructor is private, so construct it reflectively)
+  const make = () => Reflect.construct(DynamicServiceWallet as never, [client, meta, "pw", meta.accountAddress, "api-token"]) as DynamicServiceWallet;
+
+  // 1. the session dies while the server is running: the first attempt fails, the renewal fixes the second
+  const a = make();
+  sessionValid = false;
+  const seen: string[] = [];
+  a.onRetry = (_n, err) => seen.push(err);
+  assert.equal(await a.signTransaction({ chainId: 10143, type: "eip1559" }), "0x02ab");
+  assert.equal(authCalls, 1);
+  assert.match(seen[0], /Session validation failed/);
+
+  // 2. an old session is renewed up front, so the first attempt already succeeds
+  const b = make();
+  authCalls = 0;
+  const realNow = Date.now;
+  Date.now = () => realNow() + DynamicServiceWallet.SESSION_MAX_AGE_MS + 1000;
+  try {
+    assert.equal(await b.signTransaction({ chainId: 10143, type: "eip1559" }), "0x02ab");
+  } finally {
+    Date.now = realNow;
+  }
+  assert.equal(authCalls, 1);
+
+  // 3. a failing renewal does not hide the real error
+  const c = Reflect.construct(DynamicServiceWallet as never, [{ authenticateApiToken: async () => { throw new Error("auth down"); }, signTransaction: async () => { throw new Error("relay down"); } }, meta, "pw", meta.accountAddress, "t"]) as DynamicServiceWallet;
+  await assert.rejects(c.signTransaction({ chainId: 10143, type: "eip1559" }), /relay down/);
+});
