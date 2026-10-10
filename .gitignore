@@ -9,3 +9,13 @@ cache/
 next-env.d.ts
 .vercel
 .operator-e2e-user
+
+# video production work folders (renders, scratch)
+pitch-video/
+demo-video/
+privy-video/
+dynamic-video/
+vo2/
+thumbnails/
+readme-assets/
+.pitch-bak/
