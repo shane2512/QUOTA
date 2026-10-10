@@ -2,7 +2,7 @@
 
 Source of truth for the full system: `DESIGN.md`. This file records only the rules later passes must not re-derive.
 
-- **Mood:** premium / technical, night side. Reference: Moto (Awwwards SOTD), rebuilt in `moto-landing/`.
+- **Mood:** premium / technical, night side. Reference: Moto (Awwwards SOTD); the static prototype was removed from the repo once the real site replaced it.
 - **Ground:** dark `#0a0b0b`; light paper `#e5e8e6` via the `.light` scope for editorial sections only.
 - **Colour carries meaning only:** leaf = verified, signal = slash/violation, amber = pending. No decorative accent.
 - **Type:** Archivo expanded (`--f-display`, 600, `font-stretch` 116–118%, uppercase) for every heading tier; Inter Tight body; JetBrains Mono for data, labels, code only. Three families, no more.
